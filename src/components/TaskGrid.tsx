@@ -111,15 +111,21 @@ function DraggableTask({
 
   const handleBoxClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (e.ctrlKey || e.metaKey) {
-      const newSelected = new Set(selectedTasks);
-      if (newSelected.has(task.id)) {
+    const newSelected = new Set(selectedTasks);
+    if (newSelected.has(task.id)) {
+      newSelected.delete(task.id);
+    } else if (e.ctrlKey || e.metaKey) {
+      newSelected.add(task.id);
+    } else {
+      // Normal click: if task is selected, deselect it; otherwise, select only this task
+      if (selectedTasks.has(task.id)) {
         newSelected.delete(task.id);
       } else {
+        newSelected.clear();
         newSelected.add(task.id);
       }
-      setSelectedTasks(newSelected);
     }
+    setSelectedTasks(newSelected);
   };
 
   const handleTextClick = (e: React.MouseEvent) => {
@@ -341,6 +347,7 @@ export default function TaskGrid({
         });
       });
 
+      setSelectedTasks(new Set()); // Clear selection after move
       setActiveId(null);
       return;
     }
@@ -365,6 +372,7 @@ export default function TaskGrid({
             priority: basePriority + i,
           });
         });
+        setSelectedTasks(new Set()); // Clear selection after move
       }
     }
 
