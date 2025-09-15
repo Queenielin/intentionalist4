@@ -467,7 +467,36 @@ export default function TaskGrid({
                               ))}
 
                               {/* Reserved blank space for comfortable dropping/adding */}
-                              <div className="h-12 w-full rounded-md border border-dashed border-muted-foreground/30 bg-background/10" aria-hidden />
+                              <div 
+                                className={cn(
+                                  "h-12 w-full rounded-lg transition-all cursor-pointer group",
+                                  "border-2 border-dashed border-white/30 bg-white/10",
+                                  "hover:border-white/50 hover:bg-white/20",
+                                  "flex items-center justify-center"
+                                )}
+                                onClick={() => {
+                                  // Create a new task in this cell
+                                  const newTask = {
+                                    id: crypto.randomUUID(),
+                                    title: 'New Task',
+                                    workType,
+                                    duration,
+                                    scheduledDay: day,
+                                    completed: false,
+                                    priority: getTasksForCell(workType, duration).length + 1
+                                  };
+                                  onUpdateTask(newTask.id, newTask);
+                                  // Start editing immediately
+                                  setTimeout(() => {
+                                    setEditingTask(newTask.id);
+                                    setEditTitle(newTask.title);
+                                  }, 50);
+                                }}
+                              >
+                                <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
+                                  + Add task or drag here
+                                </span>
+                              </div>
                               
                               {cellTasks.length === 0 && (
                                 <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
