@@ -421,13 +421,13 @@ export default function TaskGrid({
             {/* Research-based limits */}
             <div className={cn(
               "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
-              getTotalWorkload() > 12 
+              getTotalWorkload() > 8 
                 ? "bg-red-500/20 border-red-400/30"
-                : getTotalWorkload() > 8
+                : getTotalWorkload() > 4
                 ? "bg-amber-500/20 border-amber-400/30"
                 : "bg-muted border-border"
             )}>
-              Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
+              Total: {getTotalWorkload().toFixed(1)}h / 4-8h (Research Limit)
             </div>
           </div>
         
