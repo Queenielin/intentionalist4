@@ -68,36 +68,37 @@ export default function TaskGrid({
     <div className="space-y-4">
       <h3 className="text-xl font-semibold capitalize">{day}</h3>
       
-      <div className="grid grid-cols-4 gap-3">
-        {/* Header Row */}
-        <div className="font-medium text-sm text-muted-foreground"></div>
-        <div className="text-center font-medium text-sm">Deep Work</div>
-        <div className="text-center font-medium text-sm">Light Work</div>
-        <div className="text-center font-medium text-sm">Admin Work</div>
-
-        {/* Duration Rows */}
-        {DURATIONS.map(duration => (
-          <div key={duration} className="contents">
-            <div className="flex items-center justify-center font-medium text-sm text-muted-foreground">
-              {duration}min
-            </div>
+      <div className="grid grid-cols-3 gap-4">
+        {WORK_TYPES.map((workType, workIndex) => (
+          DURATIONS.map((duration, durIndex) => {
+            const cellTasks = getTasksForCell(workType, duration);
+            const cellIndex = workIndex * 3 + durIndex;
             
-            {WORK_TYPES.map(workType => {
-              const cellTasks = getTasksForCell(workType, duration);
-              
-              return (
-                <Card 
-                  key={`${workType}-${duration}`}
-                  className={cn(
-                    "min-h-[120px] p-3 transition-all duration-200",
-                    "border-2 border-dashed border-muted-foreground/20",
-                    "hover:border-muted-foreground/40",
-                    cellTasks.length > 0 && "border-solid",
-                    getWorkTypeColor(workType)
-                  )}
-                >
+            return (
+              <Card 
+                key={`${workType}-${duration}`}
+                className={cn(
+                  "min-h-[140px] p-4 transition-all duration-200",
+                  "border-2 border-dashed border-muted-foreground/20",
+                  "hover:border-muted-foreground/40",
+                  cellTasks.length > 0 && "border-solid",
+                  getWorkTypeColor(workType)
+                )}
+              >
+                <div className="space-y-3">
+                  {/* Cell header */}
+                  <div className="text-center">
+                    <div className="text-sm font-semibold text-white/90 capitalize">
+                      {workType}
+                    </div>
+                    <div className="text-xs text-white/70">
+                      {duration}min
+                    </div>
+                  </div>
+                  
+                  {/* Tasks */}
                   <div className="space-y-2">
-                    {cellTasks.map((task, index) => (
+                    {cellTasks.slice(0, 3).map((task, index) => (
                       <div
                         key={task.id}
                         className={cn(
@@ -168,17 +169,23 @@ export default function TaskGrid({
                       </div>
                     ))}
                     
+                    {cellTasks.length > 3 && (
+                      <div className="text-xs text-white/60 text-center">
+                        +{cellTasks.length - 3} more
+                      </div>
+                    )}
+                    
                     {cellTasks.length === 0 && (
-                      <div className="flex items-center justify-center h-16 text-white/50 text-xs">
+                      <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
                         Drop tasks here
                       </div>
                     )}
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        ))}
+                </div>
+              </Card>
+            );
+          })
+        )).flat()}
       </div>
     </div>
   );
