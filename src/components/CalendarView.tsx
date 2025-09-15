@@ -417,14 +417,14 @@ function DraggableTask({
   startTime, 
   startMinute, 
   duration, 
-  durationInSlot, 
+  blockHeight, 
   onComplete 
 }: {
   task: Task;
   startTime: number;
   startMinute: number;
   duration: number;
-  durationInSlot: number;
+  blockHeight: number;
   onComplete: (taskId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -440,7 +440,7 @@ function DraggableTask({
       ref={setNodeRef}
       style={{ 
         ...style,
-        height: `${Math.max(24, Math.round((durationInSlot / 15) * 20))}px`,
+        height: `${Math.max(32, blockHeight)}px`,
         opacity: isDragging ? 0.5 : 1
       }}
       {...listeners}
