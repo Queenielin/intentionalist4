@@ -58,6 +58,8 @@ interface DraggableTaskProps {
   onSaveEdit: (taskId: string) => void;
   onKeyPress: (e: React.KeyboardEvent, taskId: string) => void;
   setEditTitle: (title: string) => void;
+  setSelectedTasks: (tasks: Set<string>) => void;
+  setEditingTask: (taskId: string | null) => void;
 }
 
 // Droppable cell wrapper to allow dropping into empty areas
@@ -84,7 +86,9 @@ function DraggableTask({
   onDuplicateTask, 
   onSaveEdit, 
   onKeyPress, 
-  setEditTitle 
+  setEditTitle,
+  setSelectedTasks,
+  setEditingTask
 }: DraggableTaskProps) {
   const {
     attributes,
@@ -105,6 +109,27 @@ function DraggableTask({
     onUpdateTask(task.id, { priority: task.priority ? undefined : 1 });
   };
 
+  const handleBoxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.ctrlKey || e.metaKey) {
+      const newSelected = new Set(selectedTasks);
+      if (newSelected.has(task.id)) {
+        newSelected.delete(task.id);
+      } else {
+        newSelected.add(task.id);
+      }
+      setSelectedTasks(newSelected);
+    }
+  };
+
+  const handleTextClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!e.ctrlKey && !e.metaKey) {
+      setEditingTask(task.id);
+      setEditTitle(task.title);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -120,7 +145,7 @@ function DraggableTask({
           ? "bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40" 
           : "bg-white/20 border-white/30 hover:bg-white/30"
       )}
-      onClick={(e) => onTaskClick(task, e)}
+      onClick={handleBoxClick}
     >
       <div className="flex items-center gap-2">
         <div
@@ -153,10 +178,13 @@ function DraggableTask({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <p className={cn(
-              "text-xs font-medium truncate hover:text-white/80",
-              task.priority ? "text-orange-100" : "text-white"
-            )}>
+            <p 
+              className={cn(
+                "text-xs font-medium truncate hover:text-white/80 cursor-text",
+                task.priority ? "text-orange-100" : "text-white"
+              )}
+              onClick={handleTextClick}
+            >
               {task.title}
             </p>
           )}
@@ -473,6 +501,8 @@ export default function TaskGrid({
                                   onSaveEdit={handleSaveEdit}
                                   onKeyPress={handleKeyPress}
                                   setEditTitle={setEditTitle}
+                                  setSelectedTasks={setSelectedTasks}
+                                  setEditingTask={setEditingTask}
                                 />
                               ))}
 
