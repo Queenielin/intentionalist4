@@ -7,6 +7,8 @@ export interface Task {
   duration: 15 | 30 | 60; // minutes
   completed: boolean;
   timeSlot?: string; // ISO string for scheduled time
+  scheduledDay?: 'today' | 'tomorrow';
+  priority?: number; // 1 = highest priority
   createdAt: Date;
 }
 

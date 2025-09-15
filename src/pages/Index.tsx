@@ -3,6 +3,8 @@ import { Task, WorkType } from '@/types/task';
 import TaskInput from '@/components/TaskInput';
 import TaskList from '@/components/TaskList';
 import CalendarView from '@/components/CalendarView';
+import TaskGrid from '@/components/TaskGrid';
+import WorkloadSummary from '@/components/WorkloadSummary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ListTodo, Calendar, Brain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +20,7 @@ const Index = () => {
       workType,
       duration,
       completed: false,
+      scheduledDay: 'today',
       createdAt: new Date(),
     };
 
@@ -25,6 +28,21 @@ const Index = () => {
     toast({
       title: "Task added!",
       description: `Categorized as ${workType} work (${duration} min)`,
+    });
+  };
+
+  const handleDuplicateTask = (task: Task) => {
+    const duplicatedTask: Task = {
+      ...task,
+      id: crypto.randomUUID(),
+      title: `${task.title} (copy)`,
+      createdAt: new Date(),
+    };
+
+    setTasks(prev => [...prev, duplicatedTask]);
+    toast({
+      title: "Task duplicated!",
+      description: "Task copied successfully",
     });
   };
 
@@ -81,14 +99,21 @@ const Index = () => {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="tasks" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 rounded-xl">
+        <Tabs defaultValue="planning" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50 rounded-xl">
+            <TabsTrigger 
+              value="planning" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <ListTodo className="w-4 h-4" />
+              Task Planning
+            </TabsTrigger>
             <TabsTrigger 
               value="tasks" 
               className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               <ListTodo className="w-4 h-4" />
-              Task Management
+              Task List
             </TabsTrigger>
             <TabsTrigger 
               value="calendar" 
@@ -98,6 +123,36 @@ const Index = () => {
               Schedule View
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="planning" className="mt-6 space-y-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Today */}
+              <div className="space-y-4">
+                <TaskGrid
+                  tasks={tasks}
+                  day="today"
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onDuplicateTask={handleDuplicateTask}
+                  onCompleteTask={handleCompleteTask}
+                />
+                <WorkloadSummary tasks={tasks} day="today" />
+              </div>
+
+              {/* Tomorrow */}
+              <div className="space-y-4">
+                <TaskGrid
+                  tasks={tasks}
+                  day="tomorrow"
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onDuplicateTask={handleDuplicateTask}
+                  onCompleteTask={handleCompleteTask}
+                />
+                <WorkloadSummary tasks={tasks} day="tomorrow" />
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="tasks" className="mt-6">
             <TaskList
