@@ -16,6 +16,7 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -57,6 +58,18 @@ interface DraggableTaskProps {
   setEditTitle: (title: string) => void;
 }
 
+// Droppable cell wrapper to allow dropping into empty areas
+function DroppableCell({ id, children }: { id: string; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id });
+  return <div ref={setNodeRef}>{children}</div>;
+}
+
+function parseCellId(id: string): { workType: WorkType; duration: typeof DURATIONS[number] } {
+  const [workType, durationStr] = id.split('-');
+  const d = Number(durationStr) as typeof DURATIONS[number];
+  return { workType: workType as WorkType, duration: d };
+}
+
 function DraggableTask({ 
   task, 
   index, 
@@ -94,6 +107,7 @@ function DraggableTask({
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...listeners}
       className={cn(
         "group relative p-2 rounded-lg backdrop-blur-sm",
         "border transition-all cursor-pointer",
@@ -106,7 +120,6 @@ function DraggableTask({
     >
       <div className="flex items-center gap-2">
         <div
-          {...listeners}
           className="cursor-grab active:cursor-grabbing p-1 opacity-0 group-hover:opacity-100 transition-opacity"
         >
           <GripVertical className="w-3 h-3 text-white/70" />
@@ -254,24 +267,48 @@ export default function TaskGrid({
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // If dropped on another task, reorder within the same cell
+    const activeTask = dayTasks.find(task => task.id === activeId);
+    if (!activeTask) {
+      setActiveId(null);
+      return;
+    }
+
+    // If dropped on a cell container (e.g., "deep-60")
+    const isCellTarget = WORK_TYPES.some((wt) => overId.startsWith(`${wt}-`));
+    if (isCellTarget) {
+      const { workType, duration } = parseCellId(overId);
+      const targetCellTasks = getTasksForCell(workType, duration);
+      const lastPriority = targetCellTasks.length > 0
+        ? (targetCellTasks[targetCellTasks.length - 1].priority || targetCellTasks.length)
+        : 0;
+
+      onUpdateTask(activeId, {
+        workType,
+        duration,
+        scheduledDay: day,
+        // Place at the end of the target cell by default
+        priority: lastPriority + 1,
+      });
+
+      setActiveId(null);
+      return;
+    }
+
+    // If dropped on another task, move to that task's cell and reorder
     if (overId !== activeId) {
-      const activeTask = dayTasks.find(task => task.id === activeId);
       const overTask = dayTasks.find(task => task.id === overId);
       
-      if (activeTask && overTask) {
-        // If both tasks are in the same cell, reorder
-        if (activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
-          const cellTasks = getTasksForCell(activeTask.workType, activeTask.duration);
-          const activeIndex = cellTasks.findIndex(task => task.id === activeId);
-          const overIndex = cellTasks.findIndex(task => task.id === overId);
-          
-          if (activeIndex !== overIndex) {
-            // Update priorities to reorder
-            const newPriority = overTask.priority || (overIndex + 1);
-            onUpdateTask(activeId, { priority: newPriority });
-          }
-        }
+      if (overTask) {
+        const cellTasks = getTasksForCell(overTask.workType, overTask.duration);
+        const overIndex = cellTasks.findIndex(task => task.id === overId);
+        const newPriority = overTask.priority || (overIndex + 1);
+
+        onUpdateTask(activeId, {
+          workType: overTask.workType,
+          duration: overTask.duration,
+          scheduledDay: day,
+          priority: newPriority,
+        });
       }
     }
 
@@ -299,6 +336,9 @@ export default function TaskGrid({
 
   const draggedTask = activeId ? dayTasks.find(task => task.id === activeId) : null;
 
+  const deepTotal = getWorkTypeTotal('deep');
+  const lightAdminTotal = getWorkTypeTotal('light') + getWorkTypeTotal('admin');
+  
   return (
     <DndContext
       sensors={sensors}
@@ -312,12 +352,12 @@ export default function TaskGrid({
           
           {/* Research-based limits */}
           <div className={cn(
-            "px-3 py-1 rounded-lg text-sm font-medium",
+            "px-3 py-1 rounded-lg text-sm font-semibold border",
             getTotalWorkload() > 12 
-              ? "bg-red-500/20 text-red-200 border border-red-400/30"
+              ? "bg-red-500/20 text-red-200 border-red-400/30"
               : getTotalWorkload() > 8
-              ? "bg-yellow-500/20 text-yellow-200 border border-yellow-400/30"
-              : "bg-green-500/20 text-green-200 border border-green-400/30"
+              ? "bg-amber-500/20 text-amber-200 border-amber-400/30"
+              : "bg-muted text-foreground border-border"
           )}>
             Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
           </div>
@@ -326,28 +366,33 @@ export default function TaskGrid({
         <div className="grid grid-cols-3 gap-4">
           {WORK_TYPES.map((workType) => {
             const workTypeTotal = getWorkTypeTotal(workType);
-            const isOverLimit = workTypeTotal > WORK_TYPE_LIMITS[workType];
+            const isOverLimit = workType === 'deep' ? workTypeTotal > WORK_TYPE_LIMITS.deep : lightAdminTotal > 4;
+            const isTooLow = workType === 'deep' ? workTypeTotal < 2 : lightAdminTotal < 2;
             
             return (
               <div key={workType} className="space-y-4">
                 {/* Column header with totals */}
                 <div className={cn(
                   "text-center p-3 rounded-lg transition-all",
-                  isOverLimit 
-                    ? "bg-red-500/20 border border-red-400/30" 
+                  isOverLimit
+                    ? "bg-red-500/20 border border-red-400/30"
+                    : isTooLow
+                    ? "bg-amber-500/20 border border-amber-400/30"
                     : "bg-muted/50"
                 )}>
                   <h4 className={cn(
                     "text-sm font-semibold capitalize",
-                    isOverLimit ? "text-red-200" : ""
+                    isOverLimit ? "text-red-200" : isTooLow ? "text-amber-200" : ""
                   )}>
                     {workType} Work
                   </h4>
                   <div className={cn(
                     "text-xs mt-1",
-                    isOverLimit ? "text-red-300" : "text-muted-foreground"
+                    isOverLimit ? "text-red-300" : isTooLow ? "text-amber-300" : "text-muted-foreground"
                   )}>
-                    {workTypeTotal.toFixed(1)}h / {WORK_TYPE_LIMITS[workType]}h
+                    {workType === 'deep'
+                      ? `${workTypeTotal.toFixed(1)}h (target 2-4h)`
+                      : `${workTypeTotal.toFixed(1)}h (combined ${lightAdminTotal.toFixed(1)}h / 4h)`}
                   </div>
                 </div>
                 
@@ -358,61 +403,64 @@ export default function TaskGrid({
                   const cellId = `${workType}-${duration}`;
                   
                   return (
-                    <Card 
-                      key={cellId}
-                      className={cn(
-                        "min-h-[140px] p-4 transition-all duration-200",
-                        "border-2 border-dashed border-muted-foreground/20",
-                        "hover:border-muted-foreground/40",
-                        cellTasks.length > 0 && "border-solid",
-                        getWorkTypeColor(workType)
-                      )}
-                    >
-                      <div className="space-y-3">
-                        {/* Duration header with cell total */}
-                        <div className="text-center">
-                          <div className="text-sm font-semibold text-white/90">
-                            {duration}min
-                          </div>
-                          {cellTotal > 0 && (
-                            <div className="text-xs text-white/70 mt-1">
-                              {cellTotal.toFixed(1)}h total
+                    <DroppableCell id={cellId}>
+                      <Card 
+                        key={cellId}
+                        className={cn(
+                          "min-h-[140px] p-4 transition-all duration-200",
+                          "border-2 border-dashed border-muted-foreground/20",
+                          "hover:border-muted-foreground/40",
+                          cellTasks.length > 0 && "border-solid",
+                          getWorkTypeColor(workType)
+                        )}
+                      >
+                        <div className="space-y-3">
+                          {/* Duration header with cell total */}
+                          <div className="text-center">
+                            <div className="text-sm font-semibold text-white/90">
+                              {duration}min
                             </div>
-                          )}
-                        </div>
-                      
-                        {/* Tasks */}
-                        <SortableContext 
-                          items={cellTasks.map(task => task.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <div className="space-y-2">
-                            {cellTasks.map((task, index) => (
-                              <DraggableTask
-                                key={task.id}
-                                task={task}
-                                index={index}
-                                editingTask={editingTask}
-                                editTitle={editTitle}
-                                onTaskClick={handleTaskClick}
-                                onUpdateTask={onUpdateTask}
-                                onDeleteTask={onDeleteTask}
-                                onDuplicateTask={onDuplicateTask}
-                                onSaveEdit={handleSaveEdit}
-                                onKeyPress={handleKeyPress}
-                                setEditTitle={setEditTitle}
-                              />
-                            ))}
-                            
-                            {cellTasks.length === 0 && (
-                              <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
-                                Drop tasks here
+                            {cellTotal > 0 && (
+                              <div className="text-xs text-white/70 mt-1">
+                                {cellTotal.toFixed(1)}h total
                               </div>
                             )}
                           </div>
-                        </SortableContext>
-                      </div>
-                    </Card>
+                        
+                          {/* Tasks */}
+                          <SortableContext 
+                            id={cellId}
+                            items={cellTasks.map(task => task.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-2">
+                              {cellTasks.map((task, index) => (
+                                <DraggableTask
+                                  key={task.id}
+                                  task={task}
+                                  index={index}
+                                  editingTask={editingTask}
+                                  editTitle={editTitle}
+                                  onTaskClick={handleTaskClick}
+                                  onUpdateTask={onUpdateTask}
+                                  onDeleteTask={onDeleteTask}
+                                  onDuplicateTask={onDuplicateTask}
+                                  onSaveEdit={handleSaveEdit}
+                                  onKeyPress={handleKeyPress}
+                                  setEditTitle={setEditTitle}
+                                />
+                              ))}
+                              
+                              {cellTasks.length === 0 && (
+                                <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
+                                  Drop tasks here
+                                </div>
+                              )}
+                            </div>
+                          </SortableContext>
+                        </div>
+                      </Card>
+                    </DroppableCell>
                   );
                 })}
               </div>
