@@ -396,28 +396,32 @@ export default function TaskGrid({
   const lightAdminTotal = getWorkTypeTotal('light') + getWorkTypeTotal('admin');
   
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
+    <div 
+      className="space-y-4"
+      onClick={() => setSelectedTasks(new Set())}
     >
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-semibold capitalize">{day}</h3>
-          
-          {/* Research-based limits */}
-          <div className={cn(
-            "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
-            getTotalWorkload() > 12 
-              ? "bg-red-500/20 border-red-400/30"
-              : getTotalWorkload() > 8
-              ? "bg-amber-500/20 border-amber-400/30"
-              : "bg-muted border-border"
-          )}>
-            Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold capitalize">{day}</h3>
+            
+            {/* Research-based limits */}
+            <div className={cn(
+              "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
+              getTotalWorkload() > 12 
+                ? "bg-red-500/20 border-red-400/30"
+                : getTotalWorkload() > 8
+                ? "bg-amber-500/20 border-amber-400/30"
+                : "bg-muted border-border"
+            )}>
+              Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
+            </div>
           </div>
-        </div>
         
         <div className="grid grid-cols-3 gap-4">
           {WORK_TYPES.map((workType) => {
@@ -507,14 +511,7 @@ export default function TaskGrid({
                               ))}
 
                               {/* Blank input area for adding/dragging */}
-                              <div 
-                                className={cn(
-                                  "rounded-lg transition-all",
-                                  "bg-white/10",
-                                  "hover:bg-white/20",
-                                  "p-2"
-                                )}
-                              >
+                              <div className="rounded-lg transition-all p-2">
                                 <Input
                                   value={newTaskTitles[cellId] ?? ''}
                                   onChange={(e) => setNewTaskTitles(prev => ({ ...prev, [cellId]: e.target.value }))}
@@ -545,18 +542,19 @@ export default function TaskGrid({
               </div>
             );
           })}
-        </div>
-      </div>
-
-      <DragOverlay>
-        {draggedTask ? (
-          <div className="bg-white/30 backdrop-blur-sm border border-white/50 p-2 rounded-lg">
-            <p className="text-xs font-medium text-white">
-              {draggedTask.title}
-            </p>
           </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+        </div>
+        
+        <DragOverlay>
+          {draggedTask ? (
+            <div className="bg-white/30 backdrop-blur-sm border border-white/50 p-2 rounded-lg">
+              <p className="text-xs font-medium text-white">
+                {draggedTask.title}
+              </p>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </div>
   );
 }
