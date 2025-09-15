@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { categorizeTask } from '@/utils/taskAI';
+import { parseTaskInput } from '@/utils/taskAI';
 
 interface TaskInputProps {
   onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60) => void;
@@ -14,8 +14,10 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
 
   const handleAddTask = () => {
     if (taskTitle.trim()) {
-      const { workType, duration } = categorizeTask(taskTitle);
-      onAddTask(taskTitle.trim(), workType, duration);
+      const tasks = parseTaskInput(taskTitle);
+      tasks.forEach(({ title, workType, duration }) => {
+        onAddTask(title, workType, duration);
+      });
       setTaskTitle('');
     }
   };
@@ -33,7 +35,7 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
           value={taskTitle}
           onChange={(e) => setTaskTitle(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="What needs to be done today? (AI will categorize it for you)"
+          placeholder="Add tasks (try: '1. Code for 2hr 2. Email clients 3. Review proposal')"
           className="flex-1 border-2 border-border/60 focus:border-primary transition-colors text-base h-12 focus-ring"
           autoFocus
         />
@@ -47,7 +49,7 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground mt-3 text-center">
-        ⌨️ Press Enter to quickly add tasks • AI automatically categorizes based on your input
+        ⌨️ Press Enter • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
       </p>
     </Card>
   );

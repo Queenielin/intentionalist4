@@ -1,7 +1,74 @@
 import { WorkType } from '@/types/task';
 
+// Parse multiple tasks from input
+export function parseTaskInput(input: string): Array<{ title: string; workType: WorkType; duration: 15 | 30 | 60 }> {
+  const tasks = breakDownTasks(input);
+  return tasks.map(task => {
+    const result = categorizeTask(task);
+    return { title: task, ...result };
+  });
+}
+
+// Break down input into individual tasks
+function breakDownTasks(input: string): string[] {
+  const trimmed = input.trim();
+  
+  // Check for list patterns
+  const listPatterns = [
+    /^\d+\.\s*/gm,        // 1. numbered lists
+    /^[-*•]\s*/gm,        // - bullet points
+    /^[•▪▫]\s*/gm,        // • different bullets
+    /;\s*(?=\w)/g,        // ; semicolon separation
+    /,\s*(?=\w.*(?:work|task|write|code|call|meeting|email))/gi // comma separation for task-like items
+  ];
+  
+  // Try each pattern
+  for (const pattern of listPatterns) {
+    const matches = trimmed.split(pattern).filter(item => item.trim().length > 0);
+    if (matches.length > 1) {
+      return matches.map(task => task.trim()).filter(task => task.length > 3);
+    }
+  }
+  
+  // Check for line breaks with task-like content
+  const lines = trimmed.split('\n').map(line => line.trim()).filter(line => line.length > 3);
+  if (lines.length > 1 && lines.every(line => /\w/.test(line))) {
+    return lines;
+  }
+  
+  // Single task
+  return [trimmed];
+}
+
+// Extract time duration from task text
+function extractTimeDuration(title: string): { cleanTitle: string; duration?: 15 | 30 | 60 } {
+  const timePatterns = [
+    { pattern: /(\d+)\s*h(?:our)?s?\b/i, multiplier: 60 },
+    { pattern: /(\d+)\s*hr?s?\b/i, multiplier: 60 },
+    { pattern: /(\d+)\s*min(?:ute)?s?\b/i, multiplier: 1 },
+    { pattern: /(\d+)\s*m\b/i, multiplier: 1 }
+  ];
+  
+  for (const { pattern, multiplier } of timePatterns) {
+    const match = title.match(pattern);
+    if (match) {
+      const duration = parseInt(match[1]) * multiplier;
+      const cleanTitle = title.replace(pattern, '').replace(/\s+/g, ' ').trim();
+      
+      // Round to nearest valid duration
+      if (duration <= 22) return { cleanTitle, duration: 15 };
+      if (duration <= 45) return { cleanTitle, duration: 30 };
+      return { cleanTitle, duration: 60 };
+    }
+  }
+  
+  return { cleanTitle: title };
+}
+
 // Smart AI categorization with context-aware logic
 export function categorizeTask(title: string): { workType: WorkType; duration: 15 | 30 | 60 } {
+  const { cleanTitle, duration: extractedDuration } = extractTimeDuration(title);
+  const taskTitle = cleanTitle.toLowerCase();
   const lowerTitle = title.toLowerCase();
 
   // Deep work: Requires sustained focus, creativity, or complex problem-solving
@@ -61,36 +128,36 @@ export function categorizeTask(title: string): { workType: WorkType; duration: 1
 
   // Check patterns in order of specificity (deep -> admin -> light)
   for (const { pattern, workType } of deepWorkPatterns) {
-    if (pattern.test(lowerTitle)) {
-      const duration = lowerTitle.includes('quick') || lowerTitle.includes('brief') || lowerTitle.includes('short') ? 30 : 60;
-      return { workType, duration };
+    if (pattern.test(taskTitle)) {
+      const autoDuration = taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short') ? 30 : 60;
+      return { workType, duration: extractedDuration || autoDuration };
     }
   }
 
   for (const { pattern, workType } of adminWorkPatterns) {
-    if (pattern.test(lowerTitle)) {
-      const duration = lowerTitle.includes('quick') || lowerTitle.includes('brief') || lowerTitle.includes('short') ? 15 : 30;
-      return { workType, duration };
+    if (pattern.test(taskTitle)) {
+      const autoDuration = taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short') ? 15 : 30;
+      return { workType, duration: extractedDuration || autoDuration };
     }
   }
 
   for (const { pattern, workType } of lightWorkPatterns) {
-    if (pattern.test(lowerTitle)) {
-      return { workType, duration: 30 };
+    if (pattern.test(taskTitle)) {
+      return { workType, duration: extractedDuration || 30 };
     }
   }
 
   // Fallback: simple keyword matching for edge cases
-  if (/(code|develop|write.*book|research.*deep|design.*system|algorithm|technical.*complex)/.test(lowerTitle)) {
-    return { workType: 'deep', duration: 60 };
+  if (/(code|develop|write.*book|research.*deep|design.*system|algorithm|technical.*complex)/.test(taskTitle)) {
+    return { workType: 'deep', duration: extractedDuration || 60 };
   }
   
-  if (/(email|file|schedule|invoice|admin|maintain|organize.*files)/.test(lowerTitle)) {
-    return { workType: 'admin', duration: 30 };
+  if (/(email|file|schedule|invoice|admin|maintain|organize.*files)/.test(taskTitle)) {
+    return { workType: 'admin', duration: extractedDuration || 30 };
   }
 
   // Default to light work
-  return { workType: 'light', duration: 30 };
+  return { workType: 'light', duration: extractedDuration || 30 };
 }
 
 export function getWorkTypeColor(workType: WorkType): string {
