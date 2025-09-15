@@ -6,6 +6,7 @@ import CalendarView from '@/components/CalendarView';
 import TaskGrid from '@/components/TaskGrid';
 import WorkloadSummary from '@/components/WorkloadSummary';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { ListTodo, Calendar, Brain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -125,31 +126,61 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="planning" className="mt-6 space-y-8">
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Today */}
-              <div className="space-y-4">
-                <TaskGrid
-                  tasks={tasks}
-                  day="today"
-                  onUpdateTask={handleUpdateTask}
-                  onDeleteTask={handleDeleteTask}
-                  onDuplicateTask={handleDuplicateTask}
-                  onCompleteTask={handleCompleteTask}
-                />
-                <WorkloadSummary tasks={tasks} day="today" />
-              </div>
+            {/* Today's main grid - full width */}
+            <div className="space-y-4">
+              <TaskGrid
+                tasks={tasks}
+                day="today"
+                onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask}
+                onDuplicateTask={handleDuplicateTask}
+                onCompleteTask={handleCompleteTask}
+              />
+              <WorkloadSummary tasks={tasks} day="today" />
+            </div>
 
-              {/* Tomorrow */}
-              <div className="space-y-4">
-                <TaskGrid
-                  tasks={tasks}
-                  day="tomorrow"
-                  onUpdateTask={handleUpdateTask}
-                  onDeleteTask={handleDeleteTask}
-                  onDuplicateTask={handleDuplicateTask}
-                  onCompleteTask={handleCompleteTask}
-                />
-                <WorkloadSummary tasks={tasks} day="tomorrow" />
+            {/* Tomorrow's simple column */}
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold">Tomorrow</h3>
+              <div className="bg-muted/30 rounded-lg p-4 border-2 border-dashed border-muted-foreground/20">
+                <div className="space-y-2">
+                  {tasks.filter(task => task.scheduledDay === 'tomorrow' && !task.completed).map(task => (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-3 p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{task.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {task.workType} work • {task.duration}min
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUpdateTask(task.id, { scheduledDay: 'today' })}
+                          className="text-xs"
+                        >
+                          Move to Today
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {tasks.filter(task => task.scheduledDay === 'tomorrow' && !task.completed).length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No tasks scheduled for tomorrow
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </TabsContent>

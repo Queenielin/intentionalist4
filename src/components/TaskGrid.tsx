@@ -3,7 +3,7 @@ import { Task, WorkType } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, GripVertical, Trash2 } from 'lucide-react';
+import { Copy, GripVertical, Trash2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
@@ -133,6 +133,18 @@ export default function TaskGrid({
                           </div>
                           
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onUpdateTask(task.id, { scheduledDay: 'tomorrow' });
+                              }}
+                              className="h-5 w-5 p-0 text-white/70 hover:text-white"
+                              title="Move to Tomorrow"
+                            >
+                              <Calendar className="w-3 h-3" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
