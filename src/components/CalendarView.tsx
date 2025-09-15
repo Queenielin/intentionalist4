@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { toast } from 'sonner';
 
 interface CalendarViewProps {
@@ -39,6 +39,8 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
     ]);
   }, [hourRows]);
 
+const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
 const scheduleResult = useMemo(() => {
   type ScheduledItem = {
     kind: 'task' | 'break';
@@ -55,7 +57,7 @@ const scheduleResult = useMemo(() => {
   let scheduledItems: ScheduledItem[] = [];
   let currentTime = dayStartMinutes;
 
-  const scheduled = tasks.filter((t) => !t.completed);
+  const scheduled = tasks;
   const BUCKETS: Array<15 | 30 | 60> = [60, 30, 15];
   const orderByBuckets = (arr: Task[]) => BUCKETS.flatMap((d) =>
     arr
@@ -257,7 +259,7 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     return { segments, startHourNum, dayStart, dayEnd };
   }, [scheduleResult.scheduledItems, startTime, dayLength]);
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="space-y-6">
       {/* Progress Stats */}
       <Card className="p-6 bg-gradient-to-r from-background to-muted/30 border-0 shadow-lg">

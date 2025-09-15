@@ -69,7 +69,8 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
 }
 
 function parseCellId(id: string): { workType: WorkType; duration: typeof DURATIONS[number] } {
-  const [workType, durationStr] = id.split('-');
+  const base = id.endsWith('-top') ? id.slice(0, -4) : id;
+  const [workType, durationStr] = base.split('-');
   const d = Number(durationStr) as typeof DURATIONS[number];
   return { workType: workType as WorkType, duration: d };
 }
