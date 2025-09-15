@@ -201,14 +201,51 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     const taskId = active.id as string;
     const newTimeSlot = over.id as string;
     
-    // Extract hour and minute from time slot
-    const [hour, minute] = newTimeSlot.split(':').map(Number);
-    const newStartTime = hour * 60 + minute;
-    
-    // Update task timing (this is a simplified version - you might want more complex logic)
-    toast.info('Task moved to ' + newTimeSlot);
+    if (typeof newTimeSlot === 'string' && newTimeSlot.includes(':')) {
+      // Extract hour and minute from time slot
+      const [hour, minute] = newTimeSlot.split(':').map(Number);
+      const newStartTime = hour * 60 + minute;
+      toast.info('Task moved to ' + newTimeSlot);
+    } else {
+      toast.info('Task dragged');
+    }
   };
 
+  // Visual scale: 20px per 15 minutes
+  const PX_PER_MIN = 20 / 15;
+
+  // Build a single-column timeline: gaps + items (tasks/breaks)
+  const timeline = useMemo(() => {
+    const [startHourNum] = startTime.split(':').map(Number);
+    const dayStart = startHourNum * 60;
+    const dayEnd = dayStart + dayLength * 60;
+
+    type Segment =
+      | { kind: 'gap'; startTime: number; duration: number }
+      | { kind: 'break'; label?: string; breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other'; startTime: number; duration: number }
+      | { kind: 'task'; task: Task; startTime: number; duration: number };
+
+    const segments: Segment[] = [];
+    let cursor = dayStart;
+
+    for (const item of scheduleResult.scheduledItems) {
+      if (item.startTime > cursor) {
+        segments.push({ kind: 'gap', startTime: cursor, duration: item.startTime - cursor });
+      }
+      if (item.kind === 'task') {
+        segments.push({ kind: 'task', task: item.task!, startTime: item.startTime, duration: item.duration });
+      } else {
+        segments.push({ kind: 'break', label: item.label, breakType: item.breakType, startTime: item.startTime, duration: item.duration });
+      }
+      cursor = item.startTime + item.duration;
+    }
+
+    if (cursor < dayEnd) {
+      segments.push({ kind: 'gap', startTime: cursor, duration: dayEnd - cursor });
+    }
+
+    return { segments, startHourNum, dayStart, dayEnd };
+  }, [scheduleResult.scheduledItems, startTime, dayLength]);
   return (
     <DndContext onDragEnd={handleDragEnd}>
       <div className="space-y-6">
@@ -286,105 +323,74 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
             <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-28" />
           </div>
         </div>
-        <div className="space-y-0">
-          {hourRows.map((hour) => {
-            const isCurrentHour = new Date().getHours() === hour;
-            const hourStartMinutes = hour * 60;
-            const hourEndMinutes = (hour + 1) * 60;
-            const itemsInHour = getItemsForTimeRange(hourStartMinutes, hourEndMinutes);
-            
-            // Split hour into two 30-minute rows
-            const firstHalfItems = getItemsForTimeRange(hourStartMinutes, hourStartMinutes + 30);
-            const secondHalfItems = getItemsForTimeRange(hourStartMinutes + 30, hourEndMinutes);
+        <div className="relative">
+          {/* Overlay hour grid with labels aligned to the line (left) */}
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: dayLength + 1 }).map((_, i) => {
+              const hour = timeline.startHourNum + i;
+              const top = i * 60 * PX_PER_MIN; // px from day start
+              const isCurrentHour = new Date().getHours() === hour;
+              return (
+                <div key={hour} className="absolute left-0 right-0" style={{ top }}>
+                  <div className="absolute left-0 -mt-2 text-sm font-medium text-foreground flex items-center gap-1 bg-background pr-2">
+                    <Clock className="w-3 h-3 opacity-70" />
+                    {hour}:00
+                  </div>
+                  <div className={cn(
+                    "border-t border-muted-foreground/20 w-full",
+                    isCurrentHour && "border-primary/50"
+                  )} />
+                </div>
+              );
+            })}
+          </div>
 
-            return (
-              <div key={hour} className="relative">
-                {/* Hour label aligned on the line */}
-                <div className="absolute left-0 top-0 -mt-2 text-sm font-medium text-foreground flex items-center gap-1 bg-background pr-2">
-                  <Clock className="w-3 h-3 opacity-70" />
-                  {hour}:00
-                </div>
-                
-                {/* Hour divider line */}
-                <div className={cn(
-                  "border-t border-muted-foreground/20 w-full",
-                  isCurrentHour && "border-primary/50"
-                )} />
-                
-                {/* First 30-minute slot */}
-                <div className="pl-20 py-2 min-h-[60px] flex flex-col gap-1">
-                  {firstHalfItems.map((item, i) => {
-                    const startMinutesInSlot = Math.max(0, item.startTime - hourStartMinutes);
-                    const endMinutesInSlot = Math.min(30, item.startTime + item.duration - hourStartMinutes);
-                    const durationInSlot = endMinutesInSlot - startMinutesInSlot;
-                    const startTime = Math.floor(item.startTime / 60);
-                    const startMinute = item.startTime % 60;
-                    
-                    if (durationInSlot <= 0) return null;
-                    
-                    return (
-                      <div
-                        key={`${item.kind}-${i}`}
-                        className={cn(
-                          "rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20",
-                          item.kind === 'task' ? getWorkTypeColor(item.task!.workType) : "bg-amber-500/20"
-                        )}
-                        style={{ height: `${Math.max(24, (durationInSlot / 30) * 60)}px` }}
-                      >
-                        <span className="truncate font-medium">
-                          {item.kind === 'task' ? item.task!.title : (item.label || 'Break')}
-                        </span>
-                        <div className="flex items-center gap-2 text-xs opacity-70">
-                          <span>{startTime}:{startMinute.toString().padStart(2, '0')}</span>
-                          <span>{durationInSlot}m</span>
-                          {item.kind === 'break' && item.breakType && getBreakIcon(item.breakType)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {firstHalfItems.length === 0 && (
-                    <div className="rounded bg-background/40 border border-dashed border-muted-foreground/20 h-8" />
-                  )}
-                </div>
-                
-                {/* Second 30-minute slot */}
-                <div className="pl-20 py-2 min-h-[60px] flex flex-col gap-1">
-                  {secondHalfItems.map((item, i) => {
-                    const startMinutesInSlot = Math.max(0, item.startTime - (hourStartMinutes + 30));
-                    const endMinutesInSlot = Math.min(30, item.startTime + item.duration - (hourStartMinutes + 30));
-                    const durationInSlot = endMinutesInSlot - startMinutesInSlot;
-                    const startTime = Math.floor(item.startTime / 60);
-                    const startMinute = item.startTime % 60;
-                    
-                    if (durationInSlot <= 0) return null;
-                    
-                    return (
-                      <div
-                        key={`${item.kind}-${i}`}
-                        className={cn(
-                          "rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20",
-                          item.kind === 'task' ? getWorkTypeColor(item.task!.workType) : "bg-amber-500/20"
-                        )}
-                        style={{ height: `${Math.max(24, (durationInSlot / 30) * 60)}px` }}
-                      >
-                        <span className="truncate font-medium">
-                          {item.kind === 'task' ? item.task!.title : (item.label || 'Break')}
-                        </span>
-                        <div className="flex items-center gap-2 text-xs opacity-70">
-                          <span>{startTime}:{startMinute.toString().padStart(2, '0')}</span>
-                          <span>{durationInSlot}m</span>
-                          {item.kind === 'break' && item.breakType && getBreakIcon(item.breakType)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {secondHalfItems.length === 0 && (
-                    <div className="rounded bg-background/40 border border-dashed border-muted-foreground/20 h-8" />
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {/* Single column stacked timeline */}
+          <div className="pl-20">
+            {timeline.segments.map((seg, i) => {
+              if (seg.kind === 'gap') {
+                return (
+                  <div
+                    key={`gap-${i}`}
+                    style={{ height: `${Math.max(0, seg.duration * PX_PER_MIN)}px` }}
+                  />
+                );
+              }
+
+              if (seg.kind === 'break') {
+                const h = Math.floor(seg.startTime / 60);
+                const m = seg.startTime % 60;
+                return (
+                  <div
+                    key={`break-${i}`}
+                    className="rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20 bg-amber-500/20 mb-1"
+                    style={{ height: `${Math.max(24, seg.duration * PX_PER_MIN)}px` }}
+                  >
+                    <span className="truncate font-medium">{seg.label || 'Break'}</span>
+                    <div className="flex items-center gap-2 text-xs opacity-70">
+                      <span>{h}:{m.toString().padStart(2, '0')}</span>
+                      <span>{seg.duration}m</span>
+                      {seg.breakType && getBreakIcon(seg.breakType)}
+                    </div>
+                  </div>
+                );
+              }
+
+              const h = Math.floor(seg.startTime / 60);
+              const m = seg.startTime % 60;
+              return (
+                <DraggableTask
+                  key={`task-${seg.task.id}-${i}`}
+                  task={seg.task}
+                  startTime={h}
+                  startMinute={m}
+                  duration={seg.duration}
+                  blockHeight={Math.max(32, seg.duration * PX_PER_MIN)}
+                  onComplete={handleTaskComplete}
+                />
+              );
+            })}
+          </div>
         </div>
       </Card>
 
