@@ -69,32 +69,35 @@ export default function TaskGrid({
       <h3 className="text-xl font-semibold capitalize">{day}</h3>
       
       <div className="grid grid-cols-3 gap-4">
-        {WORK_TYPES.map((workType, workIndex) => (
-          DURATIONS.map((duration, durIndex) => {
-            const cellTasks = getTasksForCell(workType, duration);
-            const cellIndex = workIndex * 3 + durIndex;
+        {WORK_TYPES.map((workType) => (
+          <div key={workType} className="space-y-4">
+            {/* Column header */}
+            <div className="text-center p-2 rounded-lg bg-muted/50">
+              <h4 className="text-sm font-semibold capitalize">{workType} Work</h4>
+            </div>
             
-            return (
-              <Card 
-                key={`${workType}-${duration}`}
-                className={cn(
-                  "min-h-[140px] p-4 transition-all duration-200",
-                  "border-2 border-dashed border-muted-foreground/20",
-                  "hover:border-muted-foreground/40",
-                  cellTasks.length > 0 && "border-solid",
-                  getWorkTypeColor(workType)
-                )}
-              >
-                <div className="space-y-3">
-                  {/* Cell header */}
-                  <div className="text-center">
-                    <div className="text-sm font-semibold text-white/90 capitalize">
-                      {workType}
+            {/* Duration cells for this work type */}
+            {DURATIONS.map((duration) => {
+              const cellTasks = getTasksForCell(workType, duration);
+              
+              return (
+                <Card 
+                  key={`${workType}-${duration}`}
+                  className={cn(
+                    "min-h-[140px] p-4 transition-all duration-200",
+                    "border-2 border-dashed border-muted-foreground/20",
+                    "hover:border-muted-foreground/40",
+                    cellTasks.length > 0 && "border-solid",
+                    getWorkTypeColor(workType)
+                  )}
+                >
+                  <div className="space-y-3">
+                    {/* Duration header */}
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-white/90">
+                        {duration}min
+                      </div>
                     </div>
-                    <div className="text-xs text-white/70">
-                      {duration}min
-                    </div>
-                  </div>
                   
                   {/* Tasks */}
                   <div className="space-y-2">
@@ -193,11 +196,12 @@ export default function TaskGrid({
                       </div>
                     )}
                   </div>
-                </div>
-              </Card>
-            );
-          })
-        )).flat()}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </div>
   );
