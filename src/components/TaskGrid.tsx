@@ -465,6 +465,9 @@ export default function TaskGrid({
                                   setEditTitle={setEditTitle}
                                 />
                               ))}
+
+                              {/* Reserved blank space for comfortable dropping/adding */}
+                              <div className="h-12 w-full rounded-md border border-dashed border-muted-foreground/30 bg-background/10" aria-hidden />
                               
                               {cellTasks.length === 0 && (
                                 <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
