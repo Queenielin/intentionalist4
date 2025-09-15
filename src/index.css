@@ -2,41 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Energy Cycle Task Management Design System */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors */
+    --background: 251 251 253;
+    --foreground: 220 26% 14%;
 
+    /* Card and surfaces */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 26% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 26% 14%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary brand */
+    --primary: 242 78% 58%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Energy work types */
+    --deep-work: 242 78% 58%;
+    --deep-work-light: 242 78% 88%;
+    --deep-work-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --light-work: 32 95% 58%;
+    --light-work-light: 32 95% 88%;
+    --light-work-foreground: 220 26% 14%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --admin-work: 142 76% 45%;
+    --admin-work-light: 142 76% 85%;
+    --admin-work-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Secondary colors */
+    --secondary: 225 29% 96%;
+    --secondary-foreground: 220 26% 14%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --muted: 225 29% 96%;
+    --muted-foreground: 220 13% 46%;
 
-    --radius: 0.5rem;
+    --accent: 225 29% 96%;
+    --accent-foreground: 220 26% 14%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 225 29% 88%;
+    --input: 225 29% 88%;
+    --ring: 242 78% 58%;
+
+    /* Gradients */
+    --gradient-deep: linear-gradient(135deg, hsl(242 78% 58%), hsl(252 83% 48%));
+    --gradient-light: linear-gradient(135deg, hsl(32 95% 58%), hsl(42 95% 48%));
+    --gradient-admin: linear-gradient(135deg, hsl(142 76% 45%), hsl(152 76% 35%));
+    --gradient-hero: linear-gradient(135deg, hsl(242 78% 58%), hsl(32 95% 58%));
+
+    /* Shadows */
+    --shadow-card: 0 4px 6px -1px hsl(220 26% 14% / 0.1), 0 2px 4px -1px hsl(220 26% 14% / 0.06);
+    --shadow-deep: 0 10px 30px -10px hsl(242 78% 58% / 0.3);
+    --shadow-light: 0 10px 30px -10px hsl(32 95% 58% / 0.3);
+    --shadow-admin: 0 10px 30px -10px hsl(142 76% 45% / 0.3);
+
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -100,6 +132,70 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-medium;
+  }
+}
+
+@layer components {
+  /* Task work type styles */
+  .task-deep {
+    @apply bg-gradient-to-r from-[hsl(var(--deep-work))] to-[hsl(var(--deep-work))] text-[hsl(var(--deep-work-foreground))];
+    box-shadow: var(--shadow-deep);
+  }
+
+  .task-light {
+    @apply bg-gradient-to-r from-[hsl(var(--light-work))] to-[hsl(var(--light-work))] text-[hsl(var(--light-work-foreground))];
+    box-shadow: var(--shadow-light);
+  }
+
+  .task-admin {
+    @apply bg-gradient-to-r from-[hsl(var(--admin-work))] to-[hsl(var(--admin-work))] text-[hsl(var(--admin-work-foreground))];
+    box-shadow: var(--shadow-admin);
+  }
+
+  .task-completed {
+    @apply opacity-60 line-through;
+    transform: scale(0.98);
+  }
+
+  /* Calendar time slot styles */
+  .time-slot {
+    @apply min-h-12 border-b border-border/50 transition-colors hover:bg-muted/30;
+  }
+
+  .time-slot-current {
+    @apply bg-primary/5 border-l-4 border-primary;
+  }
+
+  /* Task drag states */
+  .task-dragging {
+    @apply opacity-50 rotate-3 scale-95;
+    transition: var(--transition-smooth);
+  }
+
+  .task-drop-zone {
+    @apply ring-2 ring-primary/40 bg-primary/5;
+    transition: var(--transition-smooth);
+  }
+
+  /* Completion animations */
+  .task-complete-animation {
+    animation: complete-bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  @keyframes complete-bounce {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1) rotate(5deg); }
+    100% { transform: scale(0.98) rotate(0deg); }
+  }
+
+  /* Focus ring for keyboard navigation */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+
+  /* Progress bar */
+  .progress-gradient {
+    background: var(--gradient-hero);
   }
 }

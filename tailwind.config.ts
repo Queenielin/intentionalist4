@@ -47,6 +47,22 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Energy work type colors
+        "deep-work": {
+          DEFAULT: "hsl(var(--deep-work))",
+          light: "hsl(var(--deep-work-light))",
+          foreground: "hsl(var(--deep-work-foreground))",
+        },
+        "light-work": {
+          DEFAULT: "hsl(var(--light-work))",
+          light: "hsl(var(--light-work-light))",
+          foreground: "hsl(var(--light-work-foreground))",
+        },
+        "admin-work": {
+          DEFAULT: "hsl(var(--admin-work))",
+          light: "hsl(var(--admin-work-light))",
+          foreground: "hsl(var(--admin-work-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

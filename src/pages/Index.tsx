@@ -1,11 +1,117 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Task, WorkType } from '@/types/task';
+import TaskInput from '@/components/TaskInput';
+import TaskList from '@/components/TaskList';
+import CalendarView from '@/components/CalendarView';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ListTodo, Calendar, Brain } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const { toast } = useToast();
+
+  const handleAddTask = (title: string, workType: WorkType, duration: 15 | 30 | 60) => {
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      title,
+      workType,
+      duration,
+      completed: false,
+      createdAt: new Date(),
+    };
+
+    setTasks(prev => [...prev, newTask]);
+    toast({
+      title: "Task added!",
+      description: `Categorized as ${workType} work (${duration} min)`,
+    });
+  };
+
+  const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, ...updates } : task
+    ));
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks(prev => prev.filter(task => task.id !== taskId));
+    toast({
+      title: "Task deleted",
+      description: "Task removed from your list",
+      variant: "destructive",
+    });
+  };
+
+  const handleCompleteTask = (taskId: string) => {
+    setTasks(prev => prev.map(task => {
+      if (task.id === taskId) {
+        const newCompleted = !task.completed;
+        if (newCompleted) {
+          toast({
+            title: "Great job! 🎉",
+            description: "Task completed successfully",
+          });
+        }
+        return { ...task, completed: newCompleted };
+      }
+      return task;
+    }));
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <header className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Brain className="w-8 h-8 text-primary" />
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Energy Cycle Planner
+            </h1>
+          </div>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Optimize your day with AI-powered task categorization based on your natural energy cycles
+          </p>
+        </header>
+
+        {/* Task Input */}
+        <div className="mb-8">
+          <TaskInput onAddTask={handleAddTask} />
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="tasks" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 rounded-xl">
+            <TabsTrigger 
+              value="tasks" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <ListTodo className="w-4 h-4" />
+              Task Management
+            </TabsTrigger>
+            <TabsTrigger 
+              value="calendar" 
+              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            >
+              <Calendar className="w-4 h-4" />
+              Schedule View
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tasks" className="mt-6">
+            <TaskList
+              tasks={tasks}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onCompleteTask={handleCompleteTask}
+            />
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-6">
+            <CalendarView tasks={tasks} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
