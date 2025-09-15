@@ -323,7 +323,7 @@ export default function TaskGrid({
       return;
     }
 
-    // If dropped on a cell container (e.g., "deep-60")
+    // If dropped on a cell container (e.g., "deep-60" or "deep-60-top")
     const isCellTarget = WORK_TYPES.some((wt) => overId.startsWith(`${wt}-`));
     if (isCellTarget) {
       const { workType, duration } = parseCellId(overId);
@@ -331,21 +331,39 @@ export default function TaskGrid({
       const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
       // Preserve current visual order of selected tasks based on dayTasks
       const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
-      // Exclude any of the selected tasks from the target when computing last priority
+      // Exclude any of the selected tasks from the target when computing priorities
       const filteredTarget = targetCellTasks.filter(t => !orderedSelectedIds.includes(t.id));
-      const lastPriority = filteredTarget.length > 0
-        ? (filteredTarget[filteredTarget.length - 1].priority || filteredTarget.length)
-        : 0;
 
-      orderedSelectedIds.forEach((id, i) => {
-        onUpdateTask(id, {
-          workType,
-          duration,
-          scheduledDay: day,
-          // Place at the end of the target cell in group order
-          priority: lastPriority + 1 + i,
+      const droppingOnTop = overId.endsWith('-top');
+
+      if (droppingOnTop) {
+        // Place at the very top of the target cell
+        const firstPriority = filteredTarget.length > 0
+          ? (filteredTarget[0].priority ?? 1)
+          : 1;
+        orderedSelectedIds.forEach((id, i) => {
+          onUpdateTask(id, {
+            workType,
+            duration,
+            scheduledDay: day,
+            // Ensure these land before the first item (keeps relative order of selection)
+            priority: firstPriority - (orderedSelectedIds.length - i),
+          });
         });
-      });
+      } else {
+        // Default: place at the end of the target cell
+        const lastPriority = filteredTarget.length > 0
+          ? (filteredTarget[filteredTarget.length - 1].priority ?? filteredTarget.length)
+          : 0;
+        orderedSelectedIds.forEach((id, i) => {
+          onUpdateTask(id, {
+            workType,
+            duration,
+            scheduledDay: day,
+            priority: lastPriority + 1 + i,
+          });
+        });
+      }
 
       setSelectedTasks(new Set()); // Clear selection after move
       setActiveId(null);
@@ -498,6 +516,10 @@ export default function TaskGrid({
                             strategy={verticalListSortingStrategy}
                           >
                             <div className="space-y-2">
+                              {/* Top drop zone to allow placing at first position */}
+                              <DroppableCell id={`${cellId}-top`}>
+                                <div className="h-2 -mt-2" />
+                              </DroppableCell>
                               {cellTasks.map((task, index) => (
                                 <DraggableTask
                                   key={task.id}

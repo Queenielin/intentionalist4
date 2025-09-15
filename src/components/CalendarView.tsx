@@ -56,9 +56,15 @@ const scheduleResult = useMemo(() => {
   let currentTime = dayStartMinutes;
 
   const scheduled = tasks.filter((t) => !t.completed);
-  const deepTasks = scheduled.filter((t) => t.workType === 'deep');
-  const lightTasks = scheduled.filter((t) => t.workType === 'light');
-  const adminTasks = scheduled.filter((t) => t.workType === 'admin');
+  const BUCKETS: Array<15 | 30 | 60> = [60, 30, 15];
+  const orderByBuckets = (arr: Task[]) => BUCKETS.flatMap((d) =>
+    arr
+      .filter((t) => t.duration === d)
+      .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
+  );
+  const deepTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'deep'));
+  const lightTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'light'));
+  const adminTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'admin'));
 
   const addTask = (task: Task) => {
     if (task.duration === 60) {
@@ -172,24 +178,28 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
 
   const handleTaskComplete = (taskId: string) => {
     const updatedTasks = tasks.map(task =>
-      task.id === taskId ? { ...task, completed: true } : task
+      task.id === taskId ? { ...task, completed: !task.completed } : task
     );
     onTaskUpdate(updatedTasks);
     
-    // Gamification toast
-    const completedTask = tasks.find(t => t.id === taskId);
-    if (completedTask) {
-      toast.success(
-        <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-500" />
-          <div>
-            <div className="font-medium">Task Completed! 🎉</div>
-            <div className="text-sm text-muted-foreground">
-              +{completedTask.duration} XP • {completedTask.workType} work
+    const t = tasks.find(t => t.id === taskId);
+    if (t) {
+      if (!t.completed) {
+        // Just marked complete
+        toast.success(
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            <div>
+              <div className="font-medium">Task Completed! 🎉</div>
+              <div className="text-sm text-muted-foreground">
+                +{t.duration} XP • {t.workType} work
+              </div>
             </div>
           </div>
-        </div>
-      );
+        );
+      } else {
+        toast.info('Task marked as incomplete');
+      }
     }
   };
 
@@ -450,6 +460,10 @@ function DraggableTask({
         ...style,
         height: `${blockHeight}px`,
         opacity: isDragging ? 0.5 : 1
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isDragging) onComplete(task.id);
       }}
       {...listeners}
       {...attributes}
