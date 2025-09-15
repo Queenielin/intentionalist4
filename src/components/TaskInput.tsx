@@ -1,6 +1,6 @@
 import { useState, KeyboardEvent } from 'react';
 import { Plus } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { parseTaskInput } from '@/utils/taskAI';
@@ -22,8 +22,9 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
     }
   };
 
-  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
       handleAddTask();
     }
   };
@@ -31,12 +32,12 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
   return (
     <Card className="p-6 shadow-lg border-0 bg-gradient-to-r from-background to-muted/30">
       <div className="flex gap-3">
-        <Input
+        <Textarea
           value={taskTitle}
           onChange={(e) => setTaskTitle(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Add tasks (try: '1. Code for 2hr 2. Email clients 3. Review proposal')"
-          className="flex-1 border-2 border-border/60 focus:border-primary transition-colors text-base h-12 focus-ring"
+          onKeyDown={handleKeyDown}
+          placeholder="Add multiple tasks (try: '1. Code for 2hr 2. Email clients 3. Review proposal')"
+          className="flex-1 border-2 border-border/60 focus:border-primary transition-colors text-base min-h-[120px] focus-ring"
           autoFocus
         />
         <Button 
@@ -49,7 +50,7 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground mt-3 text-center">
-        ⌨️ Press Enter • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
+        ⌨️ Press Ctrl+Enter to add • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
       </p>
     </Card>
   );
