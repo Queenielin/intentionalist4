@@ -363,14 +363,16 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
                 return (
                   <div
                     key={`break-${i}`}
-                    className="rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20 bg-amber-500/20 mb-1"
-                    style={{ height: `${Math.max(24, seg.duration * PX_PER_MIN)}px` }}
+                    className="rounded text-xs flex items-center justify-between border border-background/20 bg-amber-500/20"
+                    style={{ height: `${seg.duration * PX_PER_MIN}px` }}
                   >
-                    <span className="truncate font-medium">{seg.label || 'Break'}</span>
-                    <div className="flex items-center gap-2 text-xs opacity-70">
-                      <span>{h}:{m.toString().padStart(2, '0')}</span>
-                      <span>{seg.duration}m</span>
-                      {seg.breakType && getBreakIcon(seg.breakType)}
+                    <div className="w-full h-full px-3 py-2 flex items-center justify-between">
+                      <span className="truncate font-medium">{seg.label || 'Break'}</span>
+                      <div className="flex items-center gap-2 text-xs opacity-70">
+                        <span>{h}:{m.toString().padStart(2, '0')}</span>
+                        <span>{seg.duration}m</span>
+                        {seg.breakType && getBreakIcon(seg.breakType)}
+                      </div>
                     </div>
                   </div>
                 );
@@ -385,7 +387,7 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
                   startTime={h}
                   startMinute={m}
                   duration={seg.duration}
-                  blockHeight={Math.max(32, seg.duration * PX_PER_MIN)}
+                  blockHeight={seg.duration * PX_PER_MIN}
                   onComplete={handleTaskComplete}
                 />
               );
@@ -446,7 +448,7 @@ function DraggableTask({
       ref={setNodeRef}
       style={{ 
         ...style,
-        height: `${Math.max(32, blockHeight)}px`,
+        height: `${blockHeight}px`,
         opacity: isDragging ? 0.5 : 1
       }}
       {...listeners}
