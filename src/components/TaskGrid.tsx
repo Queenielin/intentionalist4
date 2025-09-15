@@ -32,6 +32,7 @@ interface TaskGridProps {
   onDeleteTask: (taskId: string) => void;
   onDuplicateTask: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
+  onAddTask: (title: string, workType: WorkType, duration: typeof DURATIONS[number], scheduledDay?: 'today' | 'tomorrow') => void;
 }
 
 const WORK_TYPES: WorkType[] = ['deep', 'light', 'admin'];
@@ -208,13 +209,14 @@ export default function TaskGrid({
   onUpdateTask, 
   onDeleteTask, 
   onDuplicateTask, 
-  onCompleteTask 
+  onCompleteTask, 
+  onAddTask
 }: TaskGridProps) {
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-
+  const [newTaskTitles, setNewTaskTitles] = useState<Record<string, string>>({});
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -466,43 +468,33 @@ export default function TaskGrid({
                                 />
                               ))}
 
-                              {/* Reserved blank space for comfortable dropping/adding */}
+                              {/* Blank input area for adding/dragging */}
                               <div 
                                 className={cn(
-                                  "h-12 w-full rounded-lg transition-all cursor-pointer group",
+                                  "rounded-lg transition-all",
                                   "border-2 border-dashed border-white/30 bg-white/10",
                                   "hover:border-white/50 hover:bg-white/20",
-                                  "flex items-center justify-center"
+                                  "p-2"
                                 )}
-                                onClick={() => {
-                                  // Create a new task in this cell
-                                  const newTask = {
-                                    id: crypto.randomUUID(),
-                                    title: 'New Task',
-                                    workType,
-                                    duration,
-                                    scheduledDay: day,
-                                    completed: false,
-                                    priority: getTasksForCell(workType, duration).length + 1
-                                  };
-                                  onUpdateTask(newTask.id, newTask);
-                                  // Start editing immediately
-                                  setTimeout(() => {
-                                    setEditingTask(newTask.id);
-                                    setEditTitle(newTask.title);
-                                  }, 50);
-                                }}
                               >
-                                <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
-                                  + Add task or drag here
-                                </span>
+                                <Input
+                                  value={newTaskTitles[cellId] ?? ''}
+                                  onChange={(e) => setNewTaskTitles(prev => ({ ...prev, [cellId]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const title = (newTaskTitles[cellId] ?? '').trim();
+                                      if (title) {
+                                        onAddTask(title, workType, duration, day);
+                                        setNewTaskTitles(prev => ({ ...prev, [cellId]: '' }));
+                                      }
+                                    }
+                                  }}
+                                  placeholder="+ add task or drag here"
+                                  className="h-8 text-xs bg-white/20 border-white/40 text-white placeholder:text-white/60 focus:bg-white/30"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
                               </div>
                               
-                              {cellTasks.length === 0 && (
-                                <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
-                                  Drop tasks here
-                                </div>
-                              )}
                             </div>
                           </SortableContext>
                         </div>

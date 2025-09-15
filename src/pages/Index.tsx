@@ -14,14 +14,14 @@ const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const { toast } = useToast();
 
-  const handleAddTask = (title: string, workType: WorkType, duration: 15 | 30 | 60) => {
+  const handleAddTask = (title: string, workType: WorkType, duration: 15 | 30 | 60, scheduledDay: 'today' | 'tomorrow' = 'today') => {
     const newTask: Task = {
       id: crypto.randomUUID(),
       title,
       workType,
       duration,
       completed: false,
-      scheduledDay: 'today',
+      scheduledDay,
       createdAt: new Date(),
     };
 
@@ -127,6 +127,7 @@ const Index = () => {
               onDeleteTask={handleDeleteTask}
               onDuplicateTask={handleDuplicateTask}
               onCompleteTask={handleCompleteTask}
+              onAddTask={handleAddTask}
             />
 
             {/* Tomorrow's simple column */}
