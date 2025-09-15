@@ -3,10 +3,26 @@ import { Task, WorkType } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, GripVertical, Trash2, Calendar } from 'lucide-react';
+import { Copy, GripVertical, Trash2, Calendar, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface TaskGridProps {
   tasks: Task[];
@@ -20,6 +36,156 @@ interface TaskGridProps {
 const WORK_TYPES: WorkType[] = ['deep', 'light', 'admin'];
 const DURATIONS = [60, 30, 15] as const;
 
+// Research-based productivity limits (in hours)
+const WORK_TYPE_LIMITS = {
+  deep: 4,    // 4 hours max deep work per day
+  light: 6,   // 6 hours max light work per day
+  admin: 2    // 2 hours max admin work per day
+};
+
+interface DraggableTaskProps {
+  task: Task;
+  index: number;
+  editingTask: string | null;
+  editTitle: string;
+  onTaskClick: (task: Task) => void;
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  onDeleteTask: (taskId: string) => void;
+  onDuplicateTask: (task: Task) => void;
+  onSaveEdit: (taskId: string) => void;
+  onKeyPress: (e: React.KeyboardEvent, taskId: string) => void;
+  setEditTitle: (title: string) => void;
+}
+
+function DraggableTask({ 
+  task, 
+  index, 
+  editingTask, 
+  editTitle, 
+  onTaskClick, 
+  onUpdateTask, 
+  onDeleteTask, 
+  onDuplicateTask, 
+  onSaveEdit, 
+  onKeyPress, 
+  setEditTitle 
+}: DraggableTaskProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const togglePriority = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUpdateTask(task.id, { priority: task.priority ? undefined : 1 });
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className={cn(
+        "group relative p-2 rounded-lg backdrop-blur-sm",
+        "border transition-all cursor-pointer",
+        isDragging && "opacity-50 z-50",
+        task.priority 
+          ? "bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40" 
+          : "bg-white/20 border-white/30 hover:bg-white/30"
+      )}
+      onClick={() => onTaskClick(task)}
+    >
+      <div className="flex items-center gap-2">
+        <div
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <GripVertical className="w-3 h-3 text-white/70" />
+        </div>
+        
+        <button
+          onClick={togglePriority}
+          className="w-3 h-3 flex items-center justify-center"
+          title={task.priority ? "Remove priority" : "Mark as priority"}
+        >
+          {task.priority ? (
+            <AlertTriangle className="w-3 h-3 text-orange-200 fill-orange-200" />
+          ) : (
+            <div className="w-2 h-2 rounded-full bg-white/60" />
+          )}
+        </button>
+        
+        <div className="flex-1 min-w-0">
+          {editingTask === task.id ? (
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => onKeyPress(e, task.id)}
+              onBlur={() => onSaveEdit(task.id)}
+              className="text-xs h-6 bg-white/30 border-white/40 text-white"
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <p className={cn(
+              "text-xs font-medium truncate hover:text-white/80",
+              task.priority ? "text-orange-100" : "text-white"
+            )}>
+              {task.title}
+            </p>
+          )}
+        </div>
+        
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateTask(task.id, { scheduledDay: 'tomorrow' });
+            }}
+            className="h-5 w-5 p-0 text-white/70 hover:text-white"
+            title="Move to Tomorrow"
+          >
+            <Calendar className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicateTask(task);
+            }}
+            className="h-5 w-5 p-0 text-white/70 hover:text-white"
+          >
+            <Copy className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteTask(task.id);
+            }}
+            className="h-5 w-5 p-0 text-white/70 hover:text-white"
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TaskGrid({ 
   tasks, 
   day, 
@@ -30,6 +196,15 @@ export default function TaskGrid({
 }: TaskGridProps) {
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const dayTasks = tasks.filter(task => 
     day === 'today' ? !task.scheduledDay || task.scheduledDay === 'today' : task.scheduledDay === 'tomorrow'
@@ -64,139 +239,197 @@ export default function TaskGrid({
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <h3 className="text-xl font-semibold capitalize">{day}</h3>
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) {
+      setActiveId(null);
+      return;
+    }
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    // If dropped on another task, reorder within the same cell
+    if (overId !== activeId) {
+      const activeTask = dayTasks.find(task => task.id === activeId);
+      const overTask = dayTasks.find(task => task.id === overId);
       
-      <div className="grid grid-cols-3 gap-4">
-        {WORK_TYPES.map((workType) => (
-          <div key={workType} className="space-y-4">
-            {/* Column header */}
-            <div className="text-center p-2 rounded-lg bg-muted/50">
-              <h4 className="text-sm font-semibold capitalize">{workType} Work</h4>
-            </div>
+      if (activeTask && overTask) {
+        // If both tasks are in the same cell, reorder
+        if (activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
+          const cellTasks = getTasksForCell(activeTask.workType, activeTask.duration);
+          const activeIndex = cellTasks.findIndex(task => task.id === activeId);
+          const overIndex = cellTasks.findIndex(task => task.id === overId);
+          
+          if (activeIndex !== overIndex) {
+            // Update priorities to reorder
+            const newPriority = overTask.priority || (overIndex + 1);
+            onUpdateTask(activeId, { priority: newPriority });
+          }
+        }
+      }
+    }
+
+    setActiveId(null);
+  };
+
+  // Calculate total time for each work type
+  const getWorkTypeTotal = (workType: WorkType) => {
+    const total = dayTasks
+      .filter(task => task.workType === workType && !task.completed)
+      .reduce((sum, task) => sum + (task.duration / 60), 0);
+    return total;
+  };
+
+  // Calculate total time for a specific cell
+  const getCellTotal = (workType: WorkType, duration: number) => {
+    const cellTasks = getTasksForCell(workType, duration);
+    return (cellTasks.length * duration) / 60; // Convert to hours
+  };
+
+  // Get total workload across all work types
+  const getTotalWorkload = () => {
+    return WORK_TYPES.reduce((sum, workType) => sum + getWorkTypeTotal(workType), 0);
+  };
+
+  const draggedTask = activeId ? dayTasks.find(task => task.id === activeId) : null;
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold capitalize">{day}</h3>
+          
+          {/* Research-based limits */}
+          <div className={cn(
+            "px-3 py-1 rounded-lg text-sm font-medium",
+            getTotalWorkload() > 12 
+              ? "bg-red-500/20 text-red-200 border border-red-400/30"
+              : getTotalWorkload() > 8
+              ? "bg-yellow-500/20 text-yellow-200 border border-yellow-400/30"
+              : "bg-green-500/20 text-green-200 border border-green-400/30"
+          )}>
+            Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-4">
+          {WORK_TYPES.map((workType) => {
+            const workTypeTotal = getWorkTypeTotal(workType);
+            const isOverLimit = workTypeTotal > WORK_TYPE_LIMITS[workType];
             
-            {/* Duration cells for this work type */}
-            {DURATIONS.map((duration) => {
-              const cellTasks = getTasksForCell(workType, duration);
-              
-              return (
-                <Card 
-                  key={`${workType}-${duration}`}
-                  className={cn(
-                    "min-h-[140px] p-4 transition-all duration-200",
-                    "border-2 border-dashed border-muted-foreground/20",
-                    "hover:border-muted-foreground/40",
-                    cellTasks.length > 0 && "border-solid",
-                    getWorkTypeColor(workType)
-                  )}
-                >
-                  <div className="space-y-3">
-                    {/* Duration header */}
-                    <div className="text-center">
-                      <div className="text-sm font-semibold text-white/90">
-                        {duration}min
-                      </div>
-                    </div>
+            return (
+              <div key={workType} className="space-y-4">
+                {/* Column header with totals */}
+                <div className={cn(
+                  "text-center p-3 rounded-lg transition-all",
+                  isOverLimit 
+                    ? "bg-red-500/20 border border-red-400/30" 
+                    : "bg-muted/50"
+                )}>
+                  <h4 className={cn(
+                    "text-sm font-semibold capitalize",
+                    isOverLimit ? "text-red-200" : ""
+                  )}>
+                    {workType} Work
+                  </h4>
+                  <div className={cn(
+                    "text-xs mt-1",
+                    isOverLimit ? "text-red-300" : "text-muted-foreground"
+                  )}>
+                    {workTypeTotal.toFixed(1)}h / {WORK_TYPE_LIMITS[workType]}h
+                  </div>
+                </div>
+                
+                {/* Duration cells for this work type */}
+                {DURATIONS.map((duration) => {
+                  const cellTasks = getTasksForCell(workType, duration);
+                  const cellTotal = getCellTotal(workType, duration);
+                  const cellId = `${workType}-${duration}`;
                   
-                  {/* Tasks */}
-                  <div className="space-y-2">
-                    {cellTasks.map((task, index) => (
-                      <div
-                        key={task.id}
-                        className={cn(
-                          "group relative p-2 rounded-lg bg-white/20 backdrop-blur-sm",
-                          "border border-white/30 hover:bg-white/30 transition-all",
-                          "cursor-pointer"
-                        )}
-                        onClick={() => handleTaskClick(task)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-2 h-2 rounded-full bg-white/60"
-                            title={`Priority ${(task.priority || index + 1)}`}
-                          />
-                          
-                          <div className="flex-1 min-w-0">
-                            {editingTask === task.id ? (
-                              <Input
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                onKeyDown={(e) => handleKeyPress(e, task.id)}
-                                onBlur={() => handleSaveEdit(task.id)}
-                                className="text-xs h-6 bg-white/30 border-white/40 text-white"
-                                autoFocus
-                                onClick={(e) => e.stopPropagation()}
+                  return (
+                    <Card 
+                      key={cellId}
+                      className={cn(
+                        "min-h-[140px] p-4 transition-all duration-200",
+                        "border-2 border-dashed border-muted-foreground/20",
+                        "hover:border-muted-foreground/40",
+                        cellTasks.length > 0 && "border-solid",
+                        getWorkTypeColor(workType)
+                      )}
+                    >
+                      <div className="space-y-3">
+                        {/* Duration header with cell total */}
+                        <div className="text-center">
+                          <div className="text-sm font-semibold text-white/90">
+                            {duration}min
+                          </div>
+                          {cellTotal > 0 && (
+                            <div className="text-xs text-white/70 mt-1">
+                              {cellTotal.toFixed(1)}h total
+                            </div>
+                          )}
+                        </div>
+                      
+                        {/* Tasks */}
+                        <SortableContext 
+                          items={cellTasks.map(task => task.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {cellTasks.map((task, index) => (
+                              <DraggableTask
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                editingTask={editingTask}
+                                editTitle={editTitle}
+                                onTaskClick={handleTaskClick}
+                                onUpdateTask={onUpdateTask}
+                                onDeleteTask={onDeleteTask}
+                                onDuplicateTask={onDuplicateTask}
+                                onSaveEdit={handleSaveEdit}
+                                onKeyPress={handleKeyPress}
+                                setEditTitle={setEditTitle}
                               />
-                            ) : (
-                              <p className="text-xs font-medium text-white truncate hover:text-white/80">
-                                {task.title}
-                              </p>
+                            ))}
+                            
+                            {cellTasks.length === 0 && (
+                              <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
+                                Drop tasks here
+                              </div>
                             )}
                           </div>
-                          
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onUpdateTask(task.id, { scheduledDay: 'tomorrow' });
-                              }}
-                              className="h-5 w-5 p-0 text-white/70 hover:text-white"
-                              title="Move to Tomorrow"
-                            >
-                              <Calendar className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDuplicateTask(task);
-                              }}
-                              className="h-5 w-5 p-0 text-white/70 hover:text-white"
-                            >
-                              <Copy className="w-3 h-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteTask(task.id);
-                              }}
-                              className="h-5 w-5 p-0 text-white/70 hover:text-white"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        {/* Priority indicator */}
-                        {index === 0 && cellTasks.length > 1 && (
-                          <div className="absolute -top-1 -right-1">
-                            <Badge variant="secondary" className="h-4 text-xs bg-white/80 text-gray-800">
-                              High
-                            </Badge>
-                          </div>
-                        )}
+                        </SortableContext>
                       </div>
-                    ))}
-                    
-                    {cellTasks.length === 0 && (
-                      <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
-                        Drop tasks here
-                      </div>
-                    )}
-                  </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        ))}
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      <DragOverlay>
+        {draggedTask ? (
+          <div className="bg-white/30 backdrop-blur-sm border border-white/50 p-2 rounded-lg">
+            <p className="text-xs font-medium text-white">
+              {draggedTask.title}
+            </p>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }

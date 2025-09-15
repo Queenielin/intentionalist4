@@ -127,17 +127,14 @@ const Index = () => {
 
           <TabsContent value="planning" className="mt-6 space-y-8">
             {/* Today's main grid - full width */}
-            <div className="space-y-4">
-              <TaskGrid
-                tasks={tasks}
-                day="today"
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                onDuplicateTask={handleDuplicateTask}
-                onCompleteTask={handleCompleteTask}
-              />
-              <WorkloadSummary tasks={tasks} day="today" />
-            </div>
+            <TaskGrid
+              tasks={tasks}
+              day="today"
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onDuplicateTask={handleDuplicateTask}
+              onCompleteTask={handleCompleteTask}
+            />
 
             {/* Tomorrow's simple column */}
             <div className="space-y-4">
