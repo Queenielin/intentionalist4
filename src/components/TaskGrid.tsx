@@ -101,7 +101,7 @@ export default function TaskGrid({
                   
                   {/* Tasks */}
                   <div className="space-y-2">
-                    {cellTasks.slice(0, 3).map((task, index) => (
+                    {cellTasks.map((task, index) => (
                       <div
                         key={task.id}
                         className={cn(
@@ -183,12 +183,6 @@ export default function TaskGrid({
                         )}
                       </div>
                     ))}
-                    
-                    {cellTasks.length > 3 && (
-                      <div className="text-xs text-white/60 text-center">
-                        +{cellTasks.length - 3} more
-                      </div>
-                    )}
                     
                     {cellTasks.length === 0 && (
                       <div className="flex items-center justify-center h-16 text-white/50 text-xs text-center">
