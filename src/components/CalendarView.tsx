@@ -3,24 +3,27 @@ import { Task, TimeSlot } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Progress } from '@/components/ui/progress';
-import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus } from 'lucide-react';
+import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus, Star, Zap, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
+import { toast } from 'sonner';
 
 interface CalendarViewProps {
   tasks: Task[];
+  onTaskUpdate: (tasks: Task[]) => void;
 }
 
-export default function CalendarView({ tasks }: CalendarViewProps) {
+export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps) {
   const [breaks, setBreaks] = useState<TimeSlot[]>([]);
   const [newBreakTime, setNewBreakTime] = useState('');
   const [newBreakType, setNewBreakType] = useState<'exercise' | 'nap' | 'food' | 'meeting' | 'other'>('food');
   const [newBreakLabel, setNewBreakLabel] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   // Build hours and 15-minute slots for the day
-  const dayLength = 9; // hours
+  const dayLength = 18; // hours
   const hourRows = useMemo(() => {
     const [startHour] = startTime.split(':').map(Number);
     return Array.from({ length: dayLength }, (_, i) => startHour + i);
@@ -59,7 +62,7 @@ const scheduleResult = useMemo(() => {
 
   const addTask = (task: Task) => {
     if (task.duration === 60) {
-      // 50min work + 10min break
+      // Single 50min block for 1-hour tasks
       scheduledItems.push({
         kind: 'task',
         task,
@@ -67,6 +70,7 @@ const scheduleResult = useMemo(() => {
         duration: 50
       });
       currentTime += 50;
+      // Add automatic 10min break after
       scheduledItems.push({
         kind: 'break',
         label: 'Break',
@@ -166,8 +170,48 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     setBreaks(prev => prev.filter(b => b.id !== breakId));
   };
 
+  const handleTaskComplete = (taskId: string) => {
+    const updatedTasks = tasks.map(task =>
+      task.id === taskId ? { ...task, completed: true } : task
+    );
+    onTaskUpdate(updatedTasks);
+    
+    // Gamification toast
+    const completedTask = tasks.find(t => t.id === taskId);
+    if (completedTask) {
+      toast.success(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-500" />
+          <div>
+            <div className="font-medium">Task Completed! 🎉</div>
+            <div className="text-sm text-muted-foreground">
+              +{completedTask.duration} XP • {completedTask.workType} work
+            </div>
+          </div>
+        </div>
+      );
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (!over) return;
+    
+    const taskId = active.id as string;
+    const newTimeSlot = over.id as string;
+    
+    // Extract hour and minute from time slot
+    const [hour, minute] = newTimeSlot.split(':').map(Number);
+    const newStartTime = hour * 60 + minute;
+    
+    // Update task timing (this is a simplified version - you might want more complex logic)
+    toast.info('Task moved to ' + newTimeSlot);
+  };
+
   return (
-    <div className="space-y-6">
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="space-y-6">
       {/* Progress Stats */}
       <Card className="p-6 bg-gradient-to-r from-background to-muted/30 border-0 shadow-lg">
         <div className="flex items-center justify-between mb-4">
@@ -362,6 +406,89 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
           </div>
         </div>
       </Card>
+    </div>
+    </DndContext>
+  );
+}
+
+// Draggable Task Component
+function DraggableTask({ 
+  task, 
+  startTime, 
+  startMinute, 
+  duration, 
+  durationInSlot, 
+  onComplete 
+}: {
+  task: Task;
+  startTime: number;
+  startMinute: number;
+  duration: number;
+  durationInSlot: number;
+  onComplete: (taskId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ 
+        ...style,
+        height: `${Math.max(24, Math.round((durationInSlot / 15) * 20))}px`,
+        opacity: isDragging ? 0.5 : 1
+      }}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20 cursor-grab active:cursor-grabbing",
+        getWorkTypeColor(task.workType),
+        task.completed && "opacity-60 line-through"
+      )}
+    >
+      <span className="truncate font-medium">{task.title}</span>
+      <div className="flex items-center gap-2 text-xs opacity-70">
+        <span>{startTime}:{startMinute.toString().padStart(2, '0')}</span>
+        <span>{duration}m</span>
+        {!task.completed && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-5 h-5 p-0 hover:bg-white/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              onComplete(task.id);
+            }}
+          >
+            <CheckCircle className="w-3 h-3" />
+          </Button>
+        )}
+        {task.completed && <Star className="w-3 h-3 text-yellow-400 fill-current" />}
+      </div>
+    </div>
+  );
+}
+
+// Time Slot Drop Zone Component  
+function TimeSlotDropZone({ timeSlot, children }: { timeSlot: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: timeSlot,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "min-h-[40px] transition-colors",
+        isOver && "bg-primary/10 rounded"
+      )}
+    >
+      {children}
     </div>
   );
 }

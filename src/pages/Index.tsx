@@ -178,7 +178,7 @@ const Index = () => {
 
 
           <TabsContent value="calendar" className="mt-6">
-            <CalendarView tasks={tasks} />
+            <CalendarView tasks={tasks} onTaskUpdate={setTasks} />
           </TabsContent>
         </Tabs>
       </div>
