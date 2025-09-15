@@ -18,75 +18,64 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
   const [newBreakTime, setNewBreakTime] = useState('');
   const [newBreakType, setNewBreakType] = useState<'exercise' | 'nap' | 'food' | 'meeting' | 'other'>('food');
   const [newBreakLabel, setNewBreakLabel] = useState('');
+  const [startTime, setStartTime] = useState('09:00');
+const timeSlots = useMemo(() => {
+  const [startHour] = startTime.split(':').map(Number);
+  const slots: TimeSlot[] = [];
+  const dayLength = 9; // hours
+  for (let i = 0; i < dayLength; i++) {
+    const hour = startHour + i;
+    slots.push({ id: `${hour}:00`, time: `${hour}:00`, hour, minute: 0 });
+  }
+  return slots;
+}, [startTime]);
 
-  const timeSlots = useMemo(() => {
-    const slots: TimeSlot[] = [];
-    for (let hour = 9; hour < 18; hour++) {
-      slots.push(
-        { id: `${hour}:00`, time: `${hour}:00`, hour, minute: 0 },
-        { id: `${hour}:30`, time: `${hour}:30`, hour, minute: 30 }
-      );
+const scheduleResult = useMemo(() => {
+  const slots = timeSlots;
+  const scheduled = tasks.filter(t => !t.completed).map(t => ({ ...t } as Task));
+  let currentSlotIndex = 0;
+
+  // Schedule deep work first
+  const deepTasks = scheduled.filter(t => t.workType === 'deep');
+  deepTasks.forEach(task => {
+    if (currentSlotIndex < slots.length) {
+      task.timeSlot = slots[currentSlotIndex]?.time;
+      currentSlotIndex += 1; // hourly view: each task takes one slot
     }
-    return slots;
-  }, []);
+  });
 
-  const scheduledTasks = useMemo(() => {
-    const incompleteTasks = tasks.filter(t => !t.completed);
-    const scheduled = [...incompleteTasks];
-    
-    // Simple scheduling algorithm: deep work in morning, light work midday, admin work afternoon
-    let currentSlotIndex = 0;
-    
-    // Schedule deep work first (9:00 AM - 12:00 PM)
-    const deepTasks = scheduled.filter(t => t.workType === 'deep');
-    deepTasks.forEach(task => {
-      if (currentSlotIndex < 6) { // First 6 slots (9:00-12:00)
-        task.timeSlot = timeSlots[currentSlotIndex]?.time;
-        const slotsNeeded = task.duration === 60 ? 2 : 1;
-        currentSlotIndex += slotsNeeded;
-      }
-    });
+  // Automatic 1h break between deep and light
+  const autoBreakTime = slots[currentSlotIndex]?.time;
+  if (currentSlotIndex < slots.length) currentSlotIndex += 1;
 
-    // Schedule light work (12:00 PM - 3:00 PM)
-    const lightTasks = scheduled.filter(t => t.workType === 'light');
-    lightTasks.forEach(task => {
-      if (currentSlotIndex < 12) { // Slots 6-12 (12:00-15:00)
-        task.timeSlot = timeSlots[currentSlotIndex]?.time;
-        const slotsNeeded = task.duration === 60 ? 2 : 1;
-        currentSlotIndex += slotsNeeded;
-      }
-    });
+  // Schedule light work
+  const lightTasks = scheduled.filter(t => t.workType === 'light');
+  lightTasks.forEach(task => {
+    if (currentSlotIndex < slots.length) {
+      task.timeSlot = slots[currentSlotIndex]?.time;
+      currentSlotIndex += 1;
+    }
+  });
 
-    // Schedule admin work (3:00 PM - 6:00 PM)
-    const adminTasks = scheduled.filter(t => t.workType === 'admin');
-    adminTasks.forEach(task => {
-      if (currentSlotIndex < timeSlots.length) {
-        task.timeSlot = timeSlots[currentSlotIndex]?.time;
-        const slotsNeeded = task.duration === 60 ? 2 : task.duration === 30 ? 1 : 1;
-        currentSlotIndex += slotsNeeded;
-      }
-    });
+  // Schedule admin work
+  const adminTasks = scheduled.filter(t => t.workType === 'admin');
+  adminTasks.forEach(task => {
+    if (currentSlotIndex < slots.length) {
+      task.timeSlot = slots[currentSlotIndex]?.time;
+      currentSlotIndex += 1;
+    }
+  });
 
-    return scheduled;
-  }, [tasks, timeSlots]);
+  return { scheduled, autoBreakTime };
+}, [tasks, timeSlots]);
 
   const completedTasks = tasks.filter(t => t.completed);
   const totalTasks = tasks.length;
   const completionRate = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
 
-  const getTaskForSlot = (time: string) => {
-    return scheduledTasks.find(task => {
-      if (task.timeSlot === time) return true;
-      // Check if this is the second slot of a 60-minute task
-      const taskTime = task.timeSlot;
-      if (taskTime && task.duration === 60) {
-        const [hour, minute] = taskTime.split(':').map(Number);
-        const nextSlotTime = minute === 30 ? `${hour + 1}:00` : `${hour}:30`;
-        return nextSlotTime === time;
-      }
-      return false;
-    });
-  };
+const getTaskForSlot = (time: string) => {
+  return scheduleResult.scheduled.find(task => task.timeSlot === time);
+};
 
   const getBreakForSlot = (time: string) => {
     return breaks.find(breakSlot => breakSlot.time === time);
@@ -193,11 +182,16 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
 
       {/* Calendar Schedule */}
       <Card className="p-6 border-0 shadow-lg">
-        <div className="flex items-center gap-2 mb-6">
-          <Target className="w-5 h-5 text-primary" />
-          <h3 className="text-lg font-semibold">Energy-Optimized Schedule</h3>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Target className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold">Energy-Optimized Schedule</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Start time</span>
+            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-28" />
+          </div>
         </div>
-
         <div className="grid grid-cols-1 gap-2">
           {timeSlots.map((slot) => {
             const task = getTaskForSlot(slot.time);
@@ -208,49 +202,59 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
               <div
                 key={slot.id}
                 className={cn(
-                  "time-slot flex items-center gap-3 p-3 rounded-lg",
+                  "relative flex items-start gap-3 pt-3 pb-4 border-t border-muted-foreground/20",
                   isCurrentHour && "time-slot-current"
                 )}
               >
-                <div className="w-16 text-sm font-medium text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
+                <div className="w-16 -mt-3 text-sm font-medium text-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3 opacity-70" />
                   {slot.time}
                 </div>
                 
                 <div className="flex-1">
-                  {breakSlot ? (
-                    <div className="p-3 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {getBreakIcon(breakSlot.breakType!)}
-                        <span className="font-medium text-sm text-amber-200">{breakSlot.breakLabel}</span>
+                  {(() => {
+                    const isAutoBreak = scheduleResult.autoBreakTime === slot.time;
+                    if (breakSlot || isAutoBreak) {
+                      return (
+                        <div className="p-3 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getBreakIcon(breakSlot?.breakType || 'food')}
+                            <span className="font-medium text-sm text-foreground">
+                              {breakSlot ? breakSlot.breakLabel : 'Break'}
+                            </span>
+                          </div>
+                          {breakSlot && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeBreak(breakSlot.id)}
+                              className="h-6 w-6 p-0"
+                            >
+                              ×
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    }
+                    return task ? (
+                      <div className={cn(
+                        "p-3 rounded-lg transition-all duration-300",
+                        getWorkTypeColor(task.workType),
+                        task.completed && "task-completed"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{task.title}</span>
+                          <span className="text-xs opacity-75">
+                            {task.duration}min • {task.workType}
+                          </span>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeBreak(breakSlot.id)}
-                        className="h-6 w-6 p-0 text-amber-300 hover:text-amber-100"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ) : task ? (
-                    <div className={cn(
-                      "p-3 rounded-lg transition-all duration-300",
-                      getWorkTypeColor(task.workType),
-                      task.completed && "task-completed"
-                    )}>
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{task.title}</span>
-                        <span className="text-xs opacity-75">
-                          {task.duration}min • {task.workType}
-                        </span>
+                    ) : (
+                      <div className="p-3 text-muted-foreground text-sm italic">
+                        Free time
                       </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 text-muted-foreground text-sm italic">
-                      Free time
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             );

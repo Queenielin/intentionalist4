@@ -294,36 +294,48 @@ export default function TaskGrid({
     if (isCellTarget) {
       const { workType, duration } = parseCellId(overId);
       const targetCellTasks = getTasksForCell(workType, duration);
-      const lastPriority = targetCellTasks.length > 0
-        ? (targetCellTasks[targetCellTasks.length - 1].priority || targetCellTasks.length)
+      const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
+      // Preserve current visual order of selected tasks based on dayTasks
+      const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
+      // Exclude any of the selected tasks from the target when computing last priority
+      const filteredTarget = targetCellTasks.filter(t => !orderedSelectedIds.includes(t.id));
+      const lastPriority = filteredTarget.length > 0
+        ? (filteredTarget[filteredTarget.length - 1].priority || filteredTarget.length)
         : 0;
 
-      onUpdateTask(activeId, {
-        workType,
-        duration,
-        scheduledDay: day,
-        // Place at the end of the target cell by default
-        priority: lastPriority + 1,
+      orderedSelectedIds.forEach((id, i) => {
+        onUpdateTask(id, {
+          workType,
+          duration,
+          scheduledDay: day,
+          // Place at the end of the target cell in group order
+          priority: lastPriority + 1 + i,
+        });
       });
 
       setActiveId(null);
       return;
     }
 
-    // If dropped on another task, move to that task's cell and reorder
+    // If dropped on another task, move to that task's cell and reorder (supports multi-select)
     if (overId !== activeId) {
       const overTask = dayTasks.find(task => task.id === overId);
       
       if (overTask) {
         const cellTasks = getTasksForCell(overTask.workType, overTask.duration);
-        const overIndex = cellTasks.findIndex(task => task.id === overId);
-        const newPriority = overTask.priority || (overIndex + 1);
+        const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
+        const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
+        const filteredCell = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
+        const overIndex = filteredCell.findIndex(task => task.id === overId);
+        const basePriority = (overTask.priority || (overIndex + 1));
 
-        onUpdateTask(activeId, {
-          workType: overTask.workType,
-          duration: overTask.duration,
-          scheduledDay: day,
-          priority: newPriority,
+        orderedSelectedIds.forEach((id, i) => {
+          onUpdateTask(id, {
+            workType: overTask.workType,
+            duration: overTask.duration,
+            scheduledDay: day,
+            priority: basePriority + i,
+          });
         });
       }
     }
@@ -368,12 +380,12 @@ export default function TaskGrid({
           
           {/* Research-based limits */}
           <div className={cn(
-            "px-3 py-1 rounded-lg text-sm font-semibold border",
+            "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
             getTotalWorkload() > 12 
-              ? "bg-red-500/20 text-red-200 border-red-400/30"
+              ? "bg-red-500/20 border-red-400/30"
               : getTotalWorkload() > 8
-              ? "bg-amber-500/20 text-amber-200 border-amber-400/30"
-              : "bg-muted text-foreground border-border"
+              ? "bg-amber-500/20 border-amber-400/30"
+              : "bg-muted border-border"
           )}>
             Total: {getTotalWorkload().toFixed(1)}h / 8-12h (Research Limit)
           </div>
@@ -396,10 +408,7 @@ export default function TaskGrid({
                     ? "bg-amber-500/20 border border-amber-400/30"
                     : "bg-muted/50"
                 )}>
-                  <h4 className={cn(
-                    "text-sm font-semibold capitalize",
-                    isOverLimit ? "text-red-200" : isTooLow ? "text-amber-200" : ""
-                  )}>
+                  <h4 className="text-sm font-semibold capitalize text-foreground">
                     {workType} Work
                   </h4>
                   <div className={cn(
@@ -424,9 +433,8 @@ export default function TaskGrid({
                         key={cellId}
                         className={cn(
                           "min-h-[200px] p-4 transition-all duration-200",
-                          "border-2 border-dashed border-muted-foreground/20",
+                          "border border-muted-foreground/20",
                           "hover:border-muted-foreground/40",
-                          cellTasks.length > 0 && "border-solid",
                           getWorkTypeColor(workType)
                         )}
                       >
@@ -472,8 +480,8 @@ export default function TaskGrid({
                               <div 
                                 className={cn(
                                   "rounded-lg transition-all",
-                                  "border-2 border-dashed border-white/30 bg-white/10",
-                                  "hover:border-white/50 hover:bg-white/20",
+                                  "bg-white/10",
+                                  "hover:bg-white/20",
                                   "p-2"
                                 )}
                               >
@@ -490,8 +498,10 @@ export default function TaskGrid({
                                     }
                                   }}
                                   placeholder="+ add task or drag here"
-                                  className="h-8 text-xs bg-white/20 border-white/40 text-white placeholder:text-white/60 focus:bg-white/30"
+                                  className="h-8 text-xs bg-white/20 text-white placeholder:text-white/60 focus:bg-white/30"
                                   onClick={(e) => e.stopPropagation()}
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onPointerDown={(e) => e.stopPropagation()}
                                 />
                               </div>
                               
