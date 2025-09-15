@@ -101,20 +101,13 @@ const Index = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="planning" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50 rounded-xl">
+          <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 rounded-xl">
             <TabsTrigger 
               value="planning" 
               className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               <ListTodo className="w-4 h-4" />
               Task Planning
-            </TabsTrigger>
-            <TabsTrigger 
-              value="tasks" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <ListTodo className="w-4 h-4" />
-              Task List
             </TabsTrigger>
             <TabsTrigger 
               value="calendar" 
@@ -182,14 +175,6 @@ const Index = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="tasks" className="mt-6">
-            <TaskList
-              tasks={tasks}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onCompleteTask={handleCompleteTask}
-            />
-          </TabsContent>
 
           <TabsContent value="calendar" className="mt-6">
             <CalendarView tasks={tasks} />

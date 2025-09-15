@@ -49,7 +49,8 @@ interface DraggableTaskProps {
   index: number;
   editingTask: string | null;
   editTitle: string;
-  onTaskClick: (task: Task) => void;
+  selectedTasks: Set<string>;
+  onTaskClick: (task: Task, e?: React.MouseEvent) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
   onDuplicateTask: (task: Task) => void;
@@ -75,6 +76,7 @@ function DraggableTask({
   index, 
   editingTask, 
   editTitle, 
+  selectedTasks,
   onTaskClick, 
   onUpdateTask, 
   onDeleteTask, 
@@ -112,11 +114,12 @@ function DraggableTask({
         "group relative p-2 rounded-lg backdrop-blur-sm",
         "border transition-all cursor-pointer",
         isDragging && "opacity-50 z-50",
+        selectedTasks.has(task.id) && "ring-2 ring-primary/50",
         task.priority 
           ? "bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40" 
           : "bg-white/20 border-white/30 hover:bg-white/30"
       )}
-      onClick={() => onTaskClick(task)}
+      onClick={(e) => onTaskClick(task, e)}
     >
       <div className="flex items-center gap-2">
         <div
@@ -210,6 +213,7 @@ export default function TaskGrid({
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -231,9 +235,19 @@ export default function TaskGrid({
     ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
   };
 
-  const handleTaskClick = (task: Task) => {
-    setEditingTask(task.id);
-    setEditTitle(task.title);
+  const handleTaskClick = (task: Task, e?: React.MouseEvent) => {
+    if (e?.ctrlKey || e?.metaKey) {
+      const newSelected = new Set(selectedTasks);
+      if (newSelected.has(task.id)) {
+        newSelected.delete(task.id);
+      } else {
+        newSelected.add(task.id);
+      }
+      setSelectedTasks(newSelected);
+    } else {
+      setEditingTask(task.id);
+      setEditTitle(task.title);
+    }
   };
 
   const handleSaveEdit = (taskId: string) => {
@@ -404,10 +418,10 @@ export default function TaskGrid({
                   
                   return (
                     <DroppableCell id={cellId}>
-                      <Card 
+                        <Card 
                         key={cellId}
                         className={cn(
-                          "min-h-[140px] p-4 transition-all duration-200",
+                          "min-h-[200px] p-4 transition-all duration-200",
                           "border-2 border-dashed border-muted-foreground/20",
                           "hover:border-muted-foreground/40",
                           cellTasks.length > 0 && "border-solid",
@@ -441,6 +455,7 @@ export default function TaskGrid({
                                   index={index}
                                   editingTask={editingTask}
                                   editTitle={editTitle}
+                                  selectedTasks={selectedTasks}
                                   onTaskClick={handleTaskClick}
                                   onUpdateTask={onUpdateTask}
                                   onDeleteTask={onDeleteTask}

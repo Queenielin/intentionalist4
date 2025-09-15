@@ -18,4 +18,7 @@ export interface TimeSlot {
   hour: number;
   minute: 0 | 30;
   task?: Task;
+  isBreak?: boolean;
+  breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other';
+  breakLabel?: string;
 }

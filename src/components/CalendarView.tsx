@@ -1,16 +1,24 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Task, TimeSlot } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Progress } from '@/components/ui/progress';
-import { Clock, Trophy, Target } from 'lucide-react';
+import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CalendarViewProps {
   tasks: Task[];
 }
 
 export default function CalendarView({ tasks }: CalendarViewProps) {
+  const [breaks, setBreaks] = useState<TimeSlot[]>([]);
+  const [newBreakTime, setNewBreakTime] = useState('');
+  const [newBreakType, setNewBreakType] = useState<'exercise' | 'nap' | 'food' | 'meeting' | 'other'>('food');
+  const [newBreakLabel, setNewBreakLabel] = useState('');
+
   const timeSlots = useMemo(() => {
     const slots: TimeSlot[] = [];
     for (let hour = 9; hour < 18; hour++) {
@@ -80,6 +88,45 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
     });
   };
 
+  const getBreakForSlot = (time: string) => {
+    return breaks.find(breakSlot => breakSlot.time === time);
+  };
+
+  const getBreakIcon = (type: string) => {
+    switch (type) {
+      case 'exercise': return <Dumbbell className="w-3 h-3" />;
+      case 'nap': return <div className="w-3 h-3 rounded-full bg-current" />;
+      case 'food': return <Utensils className="w-3 h-3" />;
+      case 'meeting': return <Users className="w-3 h-3" />;
+      default: return <Coffee className="w-3 h-3" />;
+    }
+  };
+
+  const addBreak = () => {
+    if (newBreakTime && newBreakLabel) {
+      const [hour, minute] = newBreakTime.split(':').map(Number);
+      const newBreak: TimeSlot = {
+        id: `break-${newBreakTime}`,
+        time: newBreakTime,
+        hour,
+        minute: minute as 0 | 30,
+        isBreak: true,
+        breakType: newBreakType,
+        breakLabel: newBreakLabel
+      };
+      setBreaks(prev => [...prev, newBreak].sort((a, b) => {
+        if (a.hour === b.hour) return a.minute - b.minute;
+        return a.hour - b.hour;
+      }));
+      setNewBreakTime('');
+      setNewBreakLabel('');
+    }
+  };
+
+  const removeBreak = (breakId: string) => {
+    setBreaks(prev => prev.filter(b => b.id !== breakId));
+  };
+
   return (
     <div className="space-y-6">
       {/* Progress Stats */}
@@ -99,6 +146,51 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
         </p>
       </Card>
 
+      {/* Add Break Section */}
+      <Card className="p-4 border-0 shadow-lg bg-muted/30">
+        <h4 className="font-medium mb-3 flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          Add Break
+        </h4>
+        <div className="grid grid-cols-4 gap-2">
+          <Select value={newBreakTime} onValueChange={setNewBreakTime}>
+            <SelectTrigger>
+              <SelectValue placeholder="Time" />
+            </SelectTrigger>
+            <SelectContent>
+              {timeSlots.map((slot) => (
+                <SelectItem key={slot.id} value={slot.time}>
+                  {slot.time}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select value={newBreakType} onValueChange={(value: any) => setNewBreakType(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="exercise">Exercise</SelectItem>
+              <SelectItem value="nap">Nap</SelectItem>
+              <SelectItem value="food">Food</SelectItem>
+              <SelectItem value="meeting">Meeting</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Input
+            placeholder="Label (e.g., Lunch)"
+            value={newBreakLabel}
+            onChange={(e) => setNewBreakLabel(e.target.value)}
+          />
+          
+          <Button onClick={addBreak} size="sm">
+            Add Break
+          </Button>
+        </div>
+      </Card>
+
       {/* Calendar Schedule */}
       <Card className="p-6 border-0 shadow-lg">
         <div className="flex items-center gap-2 mb-6">
@@ -109,6 +201,7 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
         <div className="grid grid-cols-1 gap-2">
           {timeSlots.map((slot) => {
             const task = getTaskForSlot(slot.time);
+            const breakSlot = getBreakForSlot(slot.time);
             const isCurrentHour = new Date().getHours() === slot.hour;
             
             return (
@@ -125,7 +218,22 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
                 </div>
                 
                 <div className="flex-1">
-                  {task ? (
+                  {breakSlot ? (
+                    <div className="p-3 rounded-lg bg-amber-500/20 border border-amber-400/30 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getBreakIcon(breakSlot.breakType!)}
+                        <span className="font-medium text-sm text-amber-200">{breakSlot.breakLabel}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeBreak(breakSlot.id)}
+                        className="h-6 w-6 p-0 text-amber-300 hover:text-amber-100"
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ) : task ? (
                     <div className={cn(
                       "p-3 rounded-lg transition-all duration-300",
                       getWorkTypeColor(task.workType),
