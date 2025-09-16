@@ -277,21 +277,31 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
             {completedTasks.length}/{totalTasks}
           </div>
         </div>
-        <div className="mt-2 flex items-end gap-6">
-          <div className="relative w-10 h-60 rounded-md border border-border bg-muted/30 overflow-hidden">
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center gap-2 h-8 rounded-lg border border-border bg-muted/30 overflow-hidden">
             {progressTasks.map((it, idx) => {
-              const h = totalProgressMinutes > 0 ? Math.max(6, (it.duration / totalProgressMinutes) * 240) : 0;
+              const widthPercent = totalProgressMinutes > 0 ? (it.duration / totalProgressMinutes) * 100 : 0;
+              const isPriority = it.task.duration === 60 && 
+                (it.task.workType === 'deep' || it.task.workType === 'light') && 
+                (it.task.priority || 999) <= 2;
               return (
                 <div
                   key={idx}
                   className={cn(
-                    "w-full border-b last:border-b-0",
+                    "h-full border-r last:border-r-0 border-border/50 relative flex items-center justify-center text-xs font-medium",
                     getWorkTypeColor(it.task.workType),
-                    it.task.completed && "opacity-40"
+                    it.task.completed && "opacity-40 line-through"
                   )}
-                  style={{ height: `${h}px` }}
-                  title={`${it.task.title} • ${it.duration}m`}
-                />
+                  style={{ width: `${widthPercent}%` }}
+                  title={`${it.task.title} • ${it.duration}m${isPriority ? ' • Priority' : ''}`}
+                >
+                  {isPriority && (
+                    <Star className="w-3 h-3 text-orange-200 fill-orange-200 absolute top-0.5 right-0.5" />
+                  )}
+                  <span className="truncate px-1 text-white">
+                    {it.task.title.length > 8 ? it.task.title.substring(0, 8) + '...' : it.task.title}
+                  </span>
+                </div>
               );
             })}
           </div>

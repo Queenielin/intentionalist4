@@ -52,6 +52,7 @@ interface DraggableTaskProps {
   editTitle: string;
   selectedTasks: Set<string>;
   isPriority: boolean;
+  dayTasks: Task[];
   onTaskClick: (task: Task, e?: React.MouseEvent) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
@@ -83,6 +84,7 @@ function DraggableTask({
   editTitle, 
   selectedTasks,
   isPriority,
+  dayTasks,
   onTaskClick, 
   onUpdateTask, 
   onDeleteTask, 
@@ -130,8 +132,39 @@ function DraggableTask({
       <div className="flex items-center gap-2">
         
         <div
-          className="w-3 h-3 flex items-center justify-center"
+          className="w-3 h-3 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
           aria-hidden
+          onClick={(e) => {
+            e.stopPropagation();
+            const cellTasks = dayTasks.filter(t => 
+              t.workType === task.workType && 
+              t.duration === task.duration && 
+              !t.completed
+            ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
+            
+            const currentPriority = (task.priority || 999) <= 2 && 
+              task.duration === 60 && 
+              (task.workType === 'deep' || task.workType === 'light');
+            
+            if (currentPriority) {
+              // Remove priority - move to end
+              const nonPriorityTasks = cellTasks.filter(t => 
+                t.id !== task.id && ((t.priority || 999) > 2 || 
+                t.duration !== 60 || 
+                (t.workType !== 'deep' && t.workType !== 'light'))
+              );
+              onUpdateTask(task.id, { priority: nonPriorityTasks.length + 3 });
+            } else {
+              // Add priority - move below existing priority tasks
+              const priorityTasks = cellTasks.filter(t => 
+                t.id !== task.id && 
+                (t.priority || 999) <= 2 && 
+                t.duration === 60 && 
+                (t.workType === 'deep' || t.workType === 'light')
+              );
+              onUpdateTask(task.id, { priority: priorityTasks.length + 1 });
+            }
+          }}
         >
           {isPriority ? (
             <AlertTriangle className="w-3 h-3 text-orange-200 fill-orange-200" />
@@ -494,6 +527,7 @@ export default function TaskGrid({
                                   editTitle={editTitle}
                                   selectedTasks={selectedTasks}
                                   isPriority={duration === 60 && (workType === 'deep' || workType === 'light') && index < 2}
+                                  dayTasks={dayTasks}
                                   onTaskClick={handleTaskClick}
                                   onUpdateTask={onUpdateTask}
                                   onDeleteTask={onDeleteTask}
