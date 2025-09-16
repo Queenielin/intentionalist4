@@ -137,6 +137,11 @@ const scheduleResult = useMemo(() => {
   const totalTasks = tasks.length;
   const completionRate = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
 
+  const progressTasks = useMemo(() => scheduleResult.scheduledItems
+    .filter((i: any) => i.kind === 'task') as Array<{ task: Task; startTime: number; duration: number }>,
+  [scheduleResult.scheduledItems]);
+  const totalProgressMinutes = useMemo(() => progressTasks.reduce((sum, i) => sum + i.duration, 0), [progressTasks]);
+
 const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
   return scheduleResult.scheduledItems.filter(item => 
     item.startTime < endMinutes && (item.startTime + item.duration) > startMinutes
@@ -272,10 +277,28 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
             {completedTasks.length}/{totalTasks}
           </div>
         </div>
-        <Progress value={completionRate} className="h-3 progress-gradient" />
-        <p className="text-sm text-muted-foreground mt-2">
-          {completionRate.toFixed(0)}% completed • Keep up the great work!
-        </p>
+        <div className="mt-2 flex items-end gap-6">
+          <div className="relative w-10 h-60 rounded-md border border-border bg-muted/30 overflow-hidden">
+            {progressTasks.map((it, idx) => {
+              const h = totalProgressMinutes > 0 ? Math.max(6, (it.duration / totalProgressMinutes) * 240) : 0;
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    "w-full border-b last:border-b-0",
+                    getWorkTypeColor(it.task.workType),
+                    it.task.completed && "opacity-40"
+                  )}
+                  style={{ height: `${h}px` }}
+                  title={`${it.task.title} • ${it.duration}m`}
+                />
+              );
+            })}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {completionRate.toFixed(0)}% completed • Keep up the great work!
+          </p>
+        </div>
       </Card>
 
       {/* Add Break Section */}

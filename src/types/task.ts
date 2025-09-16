@@ -8,7 +8,8 @@ export interface Task {
   completed: boolean;
   timeSlot?: string; // ISO string for scheduled time
   scheduledDay?: 'today' | 'tomorrow';
-  priority?: number; // 1 = highest priority
+  priority?: number; // 1 = highest priority (ordering index within its cell)
+  isPriority?: boolean; // visual priority badge
   createdAt: Date;
 }
 

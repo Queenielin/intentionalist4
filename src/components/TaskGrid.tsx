@@ -3,7 +3,7 @@ import { Task, WorkType } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, GripVertical, Trash2, Calendar, AlertTriangle } from 'lucide-react';
+import { Copy, Trash2, Calendar, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,7 @@ interface DraggableTaskProps {
   editingTask: string | null;
   editTitle: string;
   selectedTasks: Set<string>;
+  isPriority: boolean;
   onTaskClick: (task: Task, e?: React.MouseEvent) => void;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
   onDeleteTask: (taskId: string) => void;
@@ -81,6 +82,7 @@ function DraggableTask({
   editingTask, 
   editTitle, 
   selectedTasks,
+  isPriority,
   onTaskClick, 
   onUpdateTask, 
   onDeleteTask, 
@@ -105,29 +107,7 @@ function DraggableTask({
     transition,
   };
 
-  const togglePriority = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onUpdateTask(task.id, { priority: task.priority ? undefined : 1 });
-  };
 
-  const handleBoxClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newSelected = new Set(selectedTasks);
-    if (newSelected.has(task.id)) {
-      newSelected.delete(task.id);
-    } else if (e.ctrlKey || e.metaKey) {
-      newSelected.add(task.id);
-    } else {
-      // Normal click: if task is selected, deselect it; otherwise, select only this task
-      if (selectedTasks.has(task.id)) {
-        newSelected.delete(task.id);
-      } else {
-        newSelected.clear();
-        newSelected.add(task.id);
-      }
-    }
-    setSelectedTasks(newSelected);
-  };
 
   const handleTextClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -145,33 +125,27 @@ function DraggableTask({
       {...listeners}
       className={cn(
         "group relative p-2 rounded-lg backdrop-blur-sm",
-        "border transition-all cursor-pointer",
+        "border transition-all cursor-grab active:cursor-grabbing",
         isDragging && "opacity-50 z-50",
         selectedTasks.has(task.id) && "ring-2 ring-primary/50",
-        task.priority 
+        isPriority 
           ? "bg-orange-500/30 border-orange-400/50 hover:bg-orange-500/40" 
           : "bg-white/20 border-white/30 hover:bg-white/30"
       )}
-      onClick={handleBoxClick}
+      onClick={(e) => onTaskClick(task, e)}
     >
       <div className="flex items-center gap-2">
-        <div
-          className="cursor-grab active:cursor-grabbing p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="w-3 h-3 text-white/70" />
-        </div>
         
-        <button
-          onClick={togglePriority}
+        <div
           className="w-3 h-3 flex items-center justify-center"
-          title={task.priority ? "Remove priority" : "Mark as priority"}
+          aria-hidden
         >
-          {task.priority ? (
+          {isPriority ? (
             <AlertTriangle className="w-3 h-3 text-orange-200 fill-orange-200" />
           ) : (
             <div className="w-2 h-2 rounded-full bg-white/60" />
           )}
-        </button>
+        </div>
         
         <div className="flex-1 min-w-0">
           {editingTask === task.id ? (
@@ -188,9 +162,11 @@ function DraggableTask({
             <p 
               className={cn(
                 "text-xs font-medium truncate hover:text-white/80 cursor-text",
-                task.priority ? "text-orange-100" : "text-white"
+                isPriority ? "text-orange-100" : "text-white"
               )}
               onClick={handleTextClick}
+              onMouseDown={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               {task.title}
             </p>
@@ -251,6 +227,7 @@ export default function TaskGrid({
   const [editTitle, setEditTitle] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [newTaskTitles, setNewTaskTitles] = useState<Record<string, string>>({});
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -273,17 +250,30 @@ export default function TaskGrid({
   };
 
   const handleTaskClick = (task: Task, e?: React.MouseEvent) => {
-    if (e?.ctrlKey || e?.metaKey) {
-      const newSelected = new Set(selectedTasks);
-      if (newSelected.has(task.id)) {
-        newSelected.delete(task.id);
-      } else {
-        newSelected.add(task.id);
+    e?.stopPropagation();
+    const cellTasks = getTasksForCell(task.workType, task.duration);
+    const ids = cellTasks.map(t => t.id);
+
+    if (e?.shiftKey && lastSelectedId && ids.includes(lastSelectedId)) {
+      const start = ids.indexOf(lastSelectedId);
+      const end = ids.indexOf(task.id);
+      if (end !== -1) {
+        const [a, b] = start < end ? [start, end] : [end, start];
+        const range = ids.slice(a, b + 1);
+        setSelectedTasks(new Set(range));
+        setLastSelectedId(task.id);
+        return;
       }
-      setSelectedTasks(newSelected);
+    }
+
+    if (e?.ctrlKey || e?.metaKey) {
+      const next = new Set(selectedTasks);
+      if (next.has(task.id)) next.delete(task.id); else next.add(task.id);
+      setSelectedTasks(next);
+      setLastSelectedId(task.id);
     } else {
-      setEditingTask(task.id);
-      setEditTitle(task.title);
+      setSelectedTasks(new Set([task.id]));
+      setLastSelectedId(task.id);
     }
   };
 
@@ -324,49 +314,36 @@ export default function TaskGrid({
       return;
     }
 
+    const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
+    const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
+
+    const buildNewOrder = (cellTasks: Task[], insertIndex: number, targetWorkType: WorkType, targetDuration: typeof DURATIONS[number]) => {
+      const filtered = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
+      const newOrderIds = [
+        ...filtered.slice(0, insertIndex),
+        ...orderedSelectedIds,
+        ...filtered.slice(insertIndex)
+      ];
+      newOrderIds.forEach((id, i) => {
+        onUpdateTask(id, {
+          workType: targetWorkType,
+          duration: targetDuration,
+          scheduledDay: day,
+          priority: i + 1,
+        });
+      });
+    };
+
     // If dropped on a cell container (e.g., "deep-60" or "deep-60-top")
     const isCellTarget = WORK_TYPES.some((wt) => overId.startsWith(`${wt}-`));
     if (isCellTarget) {
       const { workType, duration } = parseCellId(overId);
       const targetCellTasks = getTasksForCell(workType, duration);
-      const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
-      // Preserve current visual order of selected tasks based on dayTasks
-      const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
-      // Exclude any of the selected tasks from the target when computing priorities
-      const filteredTarget = targetCellTasks.filter(t => !orderedSelectedIds.includes(t.id));
-
       const droppingOnTop = overId.endsWith('-top');
+      const insertIndex = droppingOnTop ? 0 : targetCellTasks.length;
 
-      if (droppingOnTop) {
-        // Place at the very top of the target cell
-        const firstPriority = filteredTarget.length > 0
-          ? (filteredTarget[0].priority ?? 1)
-          : 1;
-        orderedSelectedIds.forEach((id, i) => {
-          onUpdateTask(id, {
-            workType,
-            duration,
-            scheduledDay: day,
-            // Ensure these land before the first item (keeps relative order of selection)
-            priority: firstPriority - (orderedSelectedIds.length - i),
-          });
-        });
-      } else {
-        // Default: place at the end of the target cell
-        const lastPriority = filteredTarget.length > 0
-          ? (filteredTarget[filteredTarget.length - 1].priority ?? filteredTarget.length)
-          : 0;
-        orderedSelectedIds.forEach((id, i) => {
-          onUpdateTask(id, {
-            workType,
-            duration,
-            scheduledDay: day,
-            priority: lastPriority + 1 + i,
-          });
-        });
-      }
-
-      setSelectedTasks(new Set()); // Clear selection after move
+      buildNewOrder(targetCellTasks, insertIndex, workType, duration);
+      setSelectedTasks(new Set());
       setActiveId(null);
       return;
     }
@@ -374,24 +351,13 @@ export default function TaskGrid({
     // If dropped on another task, move to that task's cell and reorder (supports multi-select)
     if (overId !== activeId) {
       const overTask = dayTasks.find(task => task.id === overId);
-      
       if (overTask) {
         const cellTasks = getTasksForCell(overTask.workType, overTask.duration);
-        const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
-        const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
         const filteredCell = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
         const overIndex = filteredCell.findIndex(task => task.id === overId);
-        const basePriority = (overTask.priority || (overIndex + 1));
-
-        orderedSelectedIds.forEach((id, i) => {
-          onUpdateTask(id, {
-            workType: overTask.workType,
-            duration: overTask.duration,
-            scheduledDay: day,
-            priority: basePriority + i,
-          });
-        });
-        setSelectedTasks(new Set()); // Clear selection after move
+        const insertIndex = Math.max(0, overIndex);
+        buildNewOrder(cellTasks, insertIndex, overTask.workType, overTask.duration);
+        setSelectedTasks(new Set());
       }
     }
 
@@ -519,7 +485,7 @@ export default function TaskGrid({
                             <div className="space-y-2">
                               {/* Top drop zone to allow placing at first position */}
                               <DroppableCell id={`${cellId}-top`}>
-                                <div className="h-2 -mt-2" />
+                                <div className="h-6 -mt-2" />
                               </DroppableCell>
                               {cellTasks.map((task, index) => (
                                 <DraggableTask
@@ -529,6 +495,7 @@ export default function TaskGrid({
                                   editingTask={editingTask}
                                   editTitle={editTitle}
                                   selectedTasks={selectedTasks}
+                                  isPriority={duration === 60 && (workType === 'deep' || workType === 'light') && index < 2}
                                   onTaskClick={handleTaskClick}
                                   onUpdateTask={onUpdateTask}
                                   onDeleteTask={onDeleteTask}
