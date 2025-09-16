@@ -320,11 +320,11 @@ export default function TaskGrid({
     const buildNewOrder = (cellTasks: Task[], insertIndex: number, targetWorkType: WorkType, targetDuration: typeof DURATIONS[number]) => {
       const filtered = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
       const newOrderIds = [
-        ...filtered.slice(0, insertIndex),
+        ...filtered.slice(0, insertIndex).map(t => t.id),
         ...orderedSelectedIds,
-        ...filtered.slice(insertIndex)
+        ...filtered.slice(insertIndex).map(t => t.id)
       ];
-      newOrderIds.forEach((id, i) => {
+      newOrderIds.forEach((id: string, i) => {
         onUpdateTask(id, {
           workType: targetWorkType,
           duration: targetDuration,
