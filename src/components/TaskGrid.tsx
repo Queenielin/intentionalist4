@@ -109,13 +109,6 @@ function DraggableTask({
 
 
 
-  const handleTextClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!e.ctrlKey && !e.metaKey) {
-      setEditingTask(task.id);
-      setEditTitle(task.title);
-    }
-  };
 
   return (
     <div
@@ -164,9 +157,7 @@ function DraggableTask({
                 "text-xs font-medium truncate hover:text-white/80 cursor-text",
                 isPriority ? "text-orange-100" : "text-white"
               )}
-              onClick={handleTextClick}
-              onMouseDown={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => { e.stopPropagation(); setEditingTask(task.id); setEditTitle(task.title); }}
             >
               {task.title}
             </p>
@@ -356,13 +347,12 @@ export default function TaskGrid({
         const filteredCell = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
         const overIndex = filteredCell.findIndex(task => task.id === overId);
         const isSameCell = activeTask.workType === overTask.workType && activeTask.duration === overTask.duration;
-        const activeIndexInCell = filteredCell.findIndex(t => t.id === activeId);
+        const originalActiveIndex = cellTasks.findIndex(t => t.id === activeId);
+        const originalOverIndex = cellTasks.findIndex(t => t.id === overId);
         let insertIndex = Math.max(0, overIndex);
-        // If dragging within the same cell and moving downward, drop AFTER the over item
-        if (isSameCell && activeIndexInCell !== -1 && activeIndexInCell < overIndex) {
+        if (isSameCell && originalActiveIndex !== -1 && originalOverIndex !== -1 && originalActiveIndex < originalOverIndex) {
           insertIndex = overIndex + 1;
         }
-        // Clamp to end of list
         insertIndex = Math.min(insertIndex, filteredCell.length);
         buildNewOrder(cellTasks, insertIndex, overTask.workType, overTask.duration);
         setSelectedTasks(new Set());
