@@ -136,33 +136,21 @@ function DraggableTask({
           aria-hidden
           onClick={(e) => {
             e.stopPropagation();
-            const cellTasks = dayTasks.filter(t => 
-              t.workType === task.workType && 
-              t.duration === task.duration && 
-              !t.completed
-            ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
-            
-            const currentPriority = (task.priority || 999) <= 2 && 
-              task.duration === 60 && 
-              (task.workType === 'deep' || task.workType === 'light');
-            
-            if (currentPriority) {
-              // Remove priority - move to end
-              const nonPriorityTasks = cellTasks.filter(t => 
-                t.id !== task.id && ((t.priority || 999) > 2 || 
-                t.duration !== 60 || 
-                (t.workType !== 'deep' && t.workType !== 'light'))
-              );
-              onUpdateTask(task.id, { priority: nonPriorityTasks.length + 3 });
+            const cellTasks = dayTasks
+              .filter(
+                (t) => t.workType === task.workType && t.duration === task.duration && !t.completed
+              )
+              .sort((a, b) => (a.priority || 999) - (b.priority || 999));
+
+            const isCurrentlyPriority = !!task.isPriority;
+
+            if (isCurrentlyPriority) {
+              // Turn off priority but keep current position
+              onUpdateTask(task.id, { isPriority: false });
             } else {
-              // Add priority - move below existing priority tasks
-              const priorityTasks = cellTasks.filter(t => 
-                t.id !== task.id && 
-                (t.priority || 999) <= 2 && 
-                t.duration === 60 && 
-                (t.workType === 'deep' || t.workType === 'light')
-              );
-              onUpdateTask(task.id, { priority: priorityTasks.length + 1 });
+              // Make priority: position below existing priority tasks in this cell
+              const priorityTasks = cellTasks.filter((t) => t.id !== task.id && !!t.isPriority);
+              onUpdateTask(task.id, { isPriority: true, priority: priorityTasks.length + 1 });
             }
           }}
         >
@@ -526,7 +514,7 @@ export default function TaskGrid({
                                   editingTask={editingTask}
                                   editTitle={editTitle}
                                   selectedTasks={selectedTasks}
-                                  isPriority={duration === 60 && (workType === 'deep' || workType === 'light') && index < 2}
+                                  isPriority={!!task.isPriority}
                                   dayTasks={dayTasks}
                                   onTaskClick={handleTaskClick}
                                   onUpdateTask={onUpdateTask}

@@ -216,13 +216,42 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     if (!over) return;
     
     const taskId = active.id as string;
-    const newTimeSlot = over.id as string;
-    
-    if (typeof newTimeSlot === 'string' && newTimeSlot.includes(':')) {
-      // Extract hour and minute from time slot
-      const [hour, minute] = newTimeSlot.split(':').map(Number);
-      const newStartTime = hour * 60 + minute;
-      toast.info('Task moved to ' + newTimeSlot);
+    const overId = over.id as string;
+
+    // Reorder within same bucket by dropping over another task
+    const activeTask = tasks.find((t) => t.id === taskId);
+    const overTask = tasks.find((t) => t.id === overId);
+
+    if (activeTask && overTask && activeTask.id !== overTask.id && activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
+      const cellTasks = tasks
+        .filter((t) => t.workType === activeTask.workType && t.duration === activeTask.duration && !t.completed)
+        .sort((a, b) => (a.priority || 999) - (b.priority || 999));
+      const filtered = cellTasks.filter((t) => t.id !== activeTask.id);
+      const activeIndex = cellTasks.findIndex((t) => t.id === activeTask.id);
+      const overIndex = filtered.findIndex((t) => t.id === overTask.id);
+      let insertIndex = Math.max(0, overIndex);
+      if (activeIndex !== -1 && activeIndex < cellTasks.findIndex((t) => t.id === overTask.id)) {
+        insertIndex = overIndex + 1; // moving downward -> insert after
+      }
+      const newOrderIds = [
+        ...filtered.slice(0, insertIndex).map((t) => t.id),
+        activeTask.id,
+        ...filtered.slice(insertIndex).map((t) => t.id),
+      ];
+      const updated = tasks.map((t) => {
+        const idx = newOrderIds.indexOf(t.id);
+        if (idx !== -1) {
+          return { ...t, priority: idx + 1 };
+        }
+        return t;
+      });
+      onTaskUpdate(updated);
+      return;
+    }
+
+    // Handle time slot moves (future enhancement)
+    if (typeof overId === 'string' && overId.includes(':')) {
+      toast.info('Task moved to ' + overId);
     } else {
       toast.info('Task dragged');
     }
@@ -281,9 +310,7 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
           <div className="flex items-center gap-2 h-8 rounded-lg border border-border bg-muted/30 overflow-hidden">
             {progressTasks.map((it, idx) => {
               const widthPercent = totalProgressMinutes > 0 ? (it.duration / totalProgressMinutes) * 100 : 0;
-              const isPriority = it.task.duration === 60 && 
-                (it.task.workType === 'deep' || it.task.workType === 'light') && 
-                (it.task.priority || 999) <= 2;
+              const isPriority = !!it.task.isPriority;
               return (
                 <div
                   key={idx}
@@ -483,10 +510,13 @@ function DraggableTask({
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
   });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: task.id });
 
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-  } : undefined;
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined;
 
   return (
     <div
@@ -495,10 +525,6 @@ function DraggableTask({
         ...style,
         height: `${blockHeight}px`,
         opacity: isDragging ? 0.5 : 1
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!isDragging) onComplete(task.id);
       }}
       {...listeners}
       {...attributes}
