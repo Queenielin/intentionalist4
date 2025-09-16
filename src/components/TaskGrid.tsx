@@ -355,7 +355,15 @@ export default function TaskGrid({
         const cellTasks = getTasksForCell(overTask.workType, overTask.duration);
         const filteredCell = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
         const overIndex = filteredCell.findIndex(task => task.id === overId);
-        const insertIndex = Math.max(0, overIndex);
+        const isSameCell = activeTask.workType === overTask.workType && activeTask.duration === overTask.duration;
+        const activeIndexInCell = filteredCell.findIndex(t => t.id === activeId);
+        let insertIndex = Math.max(0, overIndex);
+        // If dragging within the same cell and moving downward, drop AFTER the over item
+        if (isSameCell && activeIndexInCell !== -1 && activeIndexInCell < overIndex) {
+          insertIndex = overIndex + 1;
+        }
+        // Clamp to end of list
+        insertIndex = Math.min(insertIndex, filteredCell.length);
         buildNewOrder(cellTasks, insertIndex, overTask.workType, overTask.duration);
         setSelectedTasks(new Set());
       }
