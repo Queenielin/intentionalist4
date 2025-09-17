@@ -5,7 +5,7 @@ export function parseTaskInput(input: string): Array<{ title: string; workType: 
   const tasks = breakDownTasks(input);
   return tasks.map(task => {
     const result = categorizeTask(task);
-    return { title: task, ...result };
+    return { title: result.cleanTitle, workType: result.workType, duration: result.duration };
   });
 }
 
@@ -40,124 +40,189 @@ function breakDownTasks(input: string): string[] {
   return [trimmed];
 }
 
-// Extract time duration from task text
-function extractTimeDuration(title: string): { cleanTitle: string; duration?: 15 | 30 | 60 } {
-  const timePatterns = [
-    { pattern: /(\d+)\s*h(?:our)?s?\b/i, multiplier: 60 },
-    { pattern: /(\d+)\s*hr?s?\b/i, multiplier: 60 },
-    { pattern: /(\d+)\s*min(?:ute)?s?\b/i, multiplier: 1 },
-    { pattern: /(\d+)\s*m\b/i, multiplier: 1 }
+// Extract time duration from task text, distinguishing between task duration and content duration
+function extractTimeDuration(title: string): { cleanTitle: string; duration?: 15 | 30 | 60; isTaskDuration: boolean } {
+  const taskDurationPatterns = [
+    // Explicit task duration indicators
+    { pattern: /(?:takes?|will take|need|needs|requires?|allocate|spend)\s*(\d+)\s*(?:h(?:our)?s?|hr?s?|min(?:ute)?s?|m)\b/i, multiplier: 60 },
+    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:h(?:our)?s?|hr?s?)\b/i, multiplier: 60 },
+    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:min(?:ute)?s?|m)\b/i, multiplier: 1 },
+    // Standalone time at beginning/end (likely task duration)
+    { pattern: /^(\d+)\s*(?:h(?:our)?s?|hr?s?)\s*[-:]?\s*/i, multiplier: 60 },
+    { pattern: /^(\d+)\s*(?:min(?:ute)?s?|m)\s*[-:]?\s*/i, multiplier: 1 },
+    { pattern: /\s*[-:]\s*(\d+)\s*(?:h(?:our)?s?|hr?s?)$/i, multiplier: 60 },
+    { pattern: /\s*[-:]\s*(\d+)\s*(?:min(?:ute)?s?|m)$/i, multiplier: 1 }
   ];
   
-  for (const { pattern, multiplier } of timePatterns) {
+  const contentDurationPatterns = [
+    // Content duration indicators (don't use for task duration)
+    { pattern: /(?:write|create|record|film|make|produce|draft)\s+(?:a\s+)?(\d+)\s*(?:min(?:ute)?|hour|hr?)\s+(?:video|song|skit|episode|clip|piece|article|post)/i },
+    { pattern: /(\d+)\s*(?:min(?:ute)?|hour|hr?)\s+(?:video|song|skit|episode|clip|piece|article|post|presentation|meeting|call)/i },
+    { pattern: /(?:video|song|skit|episode|clip|piece|article|post)\s+(?:of|lasting|for)\s+(\d+)\s*(?:min(?:ute)?s?|hour|hr?s?)/i }
+  ];
+  
+  // Check for content duration first (these shouldn't be removed from title)
+  for (const { pattern } of contentDurationPatterns) {
+    if (pattern.test(title)) {
+      return { cleanTitle: title, isTaskDuration: false };
+    }
+  }
+  
+  // Check for task duration patterns
+  for (const { pattern, multiplier } of taskDurationPatterns) {
     const match = title.match(pattern);
     if (match) {
       const duration = parseInt(match[1]) * multiplier;
       const cleanTitle = title.replace(pattern, '').replace(/\s+/g, ' ').trim();
       
       // Round to nearest valid duration
-      if (duration <= 22) return { cleanTitle, duration: 15 };
-      if (duration <= 45) return { cleanTitle, duration: 30 };
-      return { cleanTitle, duration: 60 };
+      let roundedDuration: 15 | 30 | 60;
+      if (duration <= 22) roundedDuration = 15;
+      else if (duration <= 45) roundedDuration = 30;
+      else roundedDuration = 60;
+      
+      return { cleanTitle, duration: roundedDuration, isTaskDuration: true };
     }
   }
   
-  return { cleanTitle: title };
+  return { cleanTitle: title, isTaskDuration: false };
 }
 
 // Smart AI categorization with context-aware logic
-export function categorizeTask(title: string): { workType: WorkType; duration: 15 | 30 | 60 } {
-  const { cleanTitle, duration: extractedDuration } = extractTimeDuration(title);
+export function categorizeTask(title: string): { workType: WorkType; duration: 15 | 30 | 60; cleanTitle: string } {
+  const { cleanTitle, duration: extractedDuration, isTaskDuration } = extractTimeDuration(title);
   const taskTitle = cleanTitle.toLowerCase();
-  const lowerTitle = title.toLowerCase();
+  const originalTitle = title.toLowerCase();
 
-  // Deep work: Requires sustained focus, creativity, or complex problem-solving
+  // Context-aware categorization based on both action and object
   const deepWorkPatterns = [
-    // Writing & Content Creation
-    { pattern: /(write|writing|draft|compose|author).*(article|blog|book|paper|proposal|documentation|content|story|script)/, workType: 'deep' as WorkType },
-    { pattern: /(create|design|develop).*(strategy|plan|architecture|system|framework|algorithm)/, workType: 'deep' as WorkType },
+    // Writing & Content Creation (context-sensitive)
+    { pattern: /(write|writing|draft|compose|author).*(book|novel|manuscript|thesis|dissertation|research\s+paper|technical\s+documentation|comprehensive\s+guide|white\s+paper|academic\s+paper)/, workType: 'deep' as WorkType },
+    { pattern: /(write|writing|draft|compose).*(proposal|strategy|business\s+plan|marketing\s+plan|project\s+plan|architecture\s+document)/, workType: 'deep' as WorkType },
+    { pattern: /(create|develop|design).*(algorithm|system\s+architecture|technical\s+specification|database\s+schema|api\s+design|framework|complex\s+logic)/, workType: 'deep' as WorkType },
     
     // Technical & Analytical Work
-    { pattern: /(code|coding|programming|develop|build).*(feature|app|software|system|website)/, workType: 'deep' as WorkType },
-    { pattern: /(analyze|analysis|research|study|investigate|examine).*(data|problem|solution|market|trend)/, workType: 'deep' as WorkType },
+    { pattern: /(code|coding|programming|develop|build|implement).*(feature|application|software|system|website|backend|frontend|database|api|integration)/, workType: 'deep' as WorkType },
+    { pattern: /(analyze|analysis|research|study|investigate|examine).*(data|problem|solution|market|trend|user\s+behavior|performance|metrics|requirements)/, workType: 'deep' as WorkType },
+    { pattern: /(debug|troubleshoot|solve|fix).*(complex|critical|technical|system|performance|integration)/, workType: 'deep' as WorkType },
     
     // Creative & Strategic Work
-    { pattern: /(design|create|brainstorm).*(ui|ux|interface|logo|brand|concept|idea)/, workType: 'deep' as WorkType },
-    { pattern: /(plan|planning|strategy|roadmap|vision)/, workType: 'deep' as WorkType },
+    { pattern: /(design|create|conceptualize).*(ui|ux|user\s+interface|user\s+experience|brand\s+identity|visual\s+system|design\s+system)/, workType: 'deep' as WorkType },
+    { pattern: /(plan|planning|strategy|strategize).*(business|product|project|marketing|technical|long.?term)/, workType: 'deep' as WorkType },
+    { pattern: /(brainstorm|ideate|conceptualize).*(product|feature|solution|innovation|creative\s+concept)/, workType: 'deep' as WorkType },
     
-    // Learning & Study
-    { pattern: /(learn|study|master|understand).*(complex|advanced|technical|new)/, workType: 'deep' as WorkType },
-    { pattern: /(read|reading).*(textbook|manual|documentation|research|technical)/, workType: 'deep' as WorkType }
+    // Learning & Study (deep vs light learning)
+    { pattern: /(learn|study|master|understand).*(programming|advanced|complex|technical|new\s+technology|framework|language|system)/, workType: 'deep' as WorkType },
+    { pattern: /(read|reading|study).*(textbook|manual|technical\s+documentation|research|academic|comprehensive)/, workType: 'deep' as WorkType },
+    
+    // Content creation requiring deep thought
+    { pattern: /(create|produce|develop).*(course|curriculum|training\s+material|educational\s+content|technical\s+content)/, workType: 'deep' as WorkType }
   ];
 
-  // Light work: Collaborative, communicative, or moderately engaging tasks
+  // Light work: Collaborative, communicative, or moderately engaging tasks  
   const lightWorkPatterns = [
     // Communication & Collaboration
-    { pattern: /(call|meeting|discuss|chat|sync|standup|retrospective|demo)/, workType: 'light' as WorkType },
-    { pattern: /(review|feedback|comment|edit).*(draft|document|proposal|code|design)/, workType: 'light' as WorkType },
-    { pattern: /(brainstorm|ideate|workshop|collaborate)/, workType: 'light' as WorkType },
+    { pattern: /(call|meeting|discuss|chat|sync|standup|retrospective|demo|interview|1.?on.?1|one.?on.?one)/, workType: 'light' as WorkType },
+    { pattern: /(review|feedback|comment|edit).*(draft|document|proposal|code|design|pull\s+request|pr)/, workType: 'light' as WorkType },
+    { pattern: /(brainstorm|ideate|workshop|collaborate|pair\s+program)/, workType: 'light' as WorkType },
     
     // Content Consumption & Light Creation
-    { pattern: /(read|reading).*(article|blog|news|update|summary|overview)/, workType: 'light' as WorkType },
-    { pattern: /(write|post).*(comment|review|feedback|social|twitter|linkedin)/, workType: 'light' as WorkType },
-    { pattern: /(prepare|setup|organize).*(meeting|presentation|workshop)/, workType: 'light' as WorkType },
+    { pattern: /(read|reading).*(article|blog|news|update|summary|overview|newsletter|social|post)/, workType: 'light' as WorkType },
+    { pattern: /(write|post|share).*(comment|review|feedback|social|twitter|linkedin|instagram|facebook|blog\s+comment|forum\s+post|quick\s+note)/, workType: 'light' as WorkType },
+    { pattern: /(write|draft).*(email|message|brief|summary|status\s+update|quick\s+guide|outline)/, workType: 'light' as WorkType },
+    { pattern: /(prepare|setup|organize).*(meeting|presentation|workshop|demo|call)/, workType: 'light' as WorkType },
     
-    // Routine Creative Work
-    { pattern: /(sketch|outline|wireframe|mockup|prototype)/, workType: 'light' as WorkType },
-    { pattern: /(update|modify|tweak|adjust).*(design|content|copy)/, workType: 'light' as WorkType }
+    // Light creative and routine tasks
+    { pattern: /(sketch|outline|wireframe|mockup|prototype|rough\s+draft)/, workType: 'light' as WorkType },
+    { pattern: /(update|modify|tweak|adjust|polish).*(design|content|copy|text|wording)/, workType: 'light' as WorkType },
+    { pattern: /(practice|rehearse|record).*(presentation|pitch|demo|video|podcast)/, workType: 'light' as WorkType },
+    
+    // Learning light content
+    { pattern: /(watch|listen).*(tutorial|webinar|podcast|youtube|course|video)/, workType: 'light' as WorkType },
+    { pattern: /(learn|study).*(basics|overview|introduction|quick\s+guide|cheat\s+sheet)/, workType: 'light' as WorkType }
   ];
 
   // Admin work: Routine, procedural, or maintenance tasks
   const adminWorkPatterns = [
     // Email & Communication Management
-    { pattern: /(email|emails|inbox|respond|reply|follow.?up)/, workType: 'admin' as WorkType },
-    { pattern: /(schedule|book|calendar|appointment|slot)/, workType: 'admin' as WorkType },
+    { pattern: /(check|clear|organize|sort).*(email|emails|inbox|messages)/, workType: 'admin' as WorkType },
+    { pattern: /(respond|reply|follow.?up).*(email|message|inquiry|request)/, workType: 'admin' as WorkType },
+    { pattern: /(schedule|book|calendar|reschedule|cancel).*(appointment|meeting|call|slot|time)/, workType: 'admin' as WorkType },
     
     // File & Data Management
-    { pattern: /(file|files|upload|download|backup|save|organize|sort|clean)/, workType: 'admin' as WorkType },
-    { pattern: /(update|maintain|sync|migrate|import|export)/, workType: 'admin' as WorkType },
+    { pattern: /(file|files|upload|download|backup|save|organize|sort|clean|archive|delete).*(documents|folders|photos|data)/, workType: 'admin' as WorkType },
+    { pattern: /(update|maintain|sync|migrate|import|export).*(database|files|contacts|calendar|settings)/, workType: 'admin' as WorkType },
+    { pattern: /(rename|move|copy|transfer).*(files|folders|documents|photos)/, workType: 'admin' as WorkType },
     
     // Financial & Administrative Tasks
-    { pattern: /(invoice|expense|receipt|bill|payment|budget|accounting)/, workType: 'admin' as WorkType },
-    { pattern: /(report|reporting|timesheet|log|tracking|documentation)/, workType: 'admin' as WorkType },
-    { pattern: /(submit|approve|process|verify|check|validate)/, workType: 'admin' as WorkType },
+    { pattern: /(invoice|expense|receipt|bill|payment|budget|accounting|tax|banking)/, workType: 'admin' as WorkType },
+    { pattern: /(timesheet|log|tracking|report|fill\s+out|complete).*(form|survey|application|paperwork)/, workType: 'admin' as WorkType },
+    { pattern: /(submit|approve|process|verify|check|validate|sign).*(document|form|request|application)/, workType: 'admin' as WorkType },
     
     // System & Tool Management
-    { pattern: /(setup|install|configure|settings|preferences|permissions)/, workType: 'admin' as WorkType }
+    { pattern: /(setup|install|configure|update).*(software|app|tool|settings|preferences|permissions|account)/, workType: 'admin' as WorkType },
+    { pattern: /(backup|restore|maintenance|cleanup|optimize).*(system|computer|files|database)/, workType: 'admin' as WorkType },
+    
+    // Routine administrative tasks
+    { pattern: /(order|purchase|buy|shop\s+for).*(supplies|equipment|groceries|household)/, workType: 'admin' as WorkType },
+    { pattern: /(book|reserve|cancel).*(travel|hotel|flight|restaurant|appointment)/, workType: 'admin' as WorkType }
   ];
 
   // Check patterns in order of specificity (deep -> admin -> light)
   for (const { pattern, workType } of deepWorkPatterns) {
     if (pattern.test(taskTitle)) {
-      const autoDuration = taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short') ? 30 : 60;
-      return { workType, duration: extractedDuration || autoDuration };
+      // Use extracted duration if it's a task duration, otherwise use context-based duration
+      let autoDuration: 15 | 30 | 60;
+      if (taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short')) {
+        autoDuration = 30;
+      } else if (taskTitle.includes('comprehensive') || taskTitle.includes('detailed') || taskTitle.includes('complex')) {
+        autoDuration = 60;
+      } else {
+        autoDuration = 60; // Default for deep work
+      }
+      return { workType, duration: (extractedDuration && isTaskDuration) ? extractedDuration : autoDuration, cleanTitle };
     }
   }
 
   for (const { pattern, workType } of adminWorkPatterns) {
     if (pattern.test(taskTitle)) {
-      const autoDuration = taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short') ? 15 : 30;
-      return { workType, duration: extractedDuration || autoDuration };
+      let autoDuration: 15 | 30 | 60;
+      if (taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short')) {
+        autoDuration = 15;
+      } else if (taskTitle.includes('organize') || taskTitle.includes('setup') || taskTitle.includes('configure')) {
+        autoDuration = 30;
+      } else {
+        autoDuration = 15; // Default for admin work
+      }
+      return { workType, duration: (extractedDuration && isTaskDuration) ? extractedDuration : autoDuration, cleanTitle };
     }
   }
 
   for (const { pattern, workType } of lightWorkPatterns) {
     if (pattern.test(taskTitle)) {
-      return { workType, duration: extractedDuration || 30 };
+      let autoDuration: 15 | 30 | 60;
+      if (taskTitle.includes('quick') || taskTitle.includes('brief') || taskTitle.includes('short')) {
+        autoDuration = 15;
+      } else if (taskTitle.includes('detailed') || taskTitle.includes('thorough')) {
+        autoDuration = 60;
+      } else {
+        autoDuration = 30; // Default for light work
+      }
+      return { workType, duration: (extractedDuration && isTaskDuration) ? extractedDuration : autoDuration, cleanTitle };
     }
   }
 
-  // Fallback: simple keyword matching for edge cases
-  if (/(code|develop|write.*book|research.*deep|design.*system|algorithm|technical.*complex)/.test(taskTitle)) {
-    return { workType: 'deep', duration: extractedDuration || 60 };
+  // Enhanced fallback with context awareness
+  if (/(write|create|develop|design|build|code|program).*(book|novel|article|blog|system|app|feature|algorithm|architecture|comprehensive|complex|detailed)/.test(taskTitle)) {
+    return { workType: 'deep', duration: (extractedDuration && isTaskDuration) ? extractedDuration : 60, cleanTitle };
   }
   
-  if (/(email|file|schedule|invoice|admin|maintain|organize.*files)/.test(taskTitle)) {
-    return { workType: 'admin', duration: extractedDuration || 30 };
+  if (/(email|inbox|file|schedule|organize|admin|maintain|backup|install|configure|invoice|expense|form|paperwork)/.test(taskTitle)) {
+    return { workType: 'admin', duration: (extractedDuration && isTaskDuration) ? extractedDuration : 15, cleanTitle };
   }
 
   // Default to light work
-  return { workType: 'light', duration: extractedDuration || 30 };
+  return { workType: 'light', duration: (extractedDuration && isTaskDuration) ? extractedDuration : 30, cleanTitle };
 }
 
 export function getWorkTypeColor(workType: WorkType): string {
