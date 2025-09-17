@@ -44,14 +44,14 @@ function breakDownTasks(input: string): string[] {
 function extractTimeDuration(title: string): { cleanTitle: string; duration?: 15 | 30 | 60; isTaskDuration: boolean } {
   const taskDurationPatterns = [
     // Explicit task duration indicators
-    { pattern: /(?:takes?|will take|need|needs|requires?|allocate|spend)\s*(\d+)\s*(?:h(?:our)?s?|hr?s?|min(?:ute)?s?|m)\b/i, multiplier: 60 },
-    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:h(?:our)?s?|hr?s?)\b/i, multiplier: 60 },
-    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:min(?:ute)?s?|m)\b/i, multiplier: 1 },
+    { pattern: /(?:takes?|will take|need|needs|requires?|allocate|spend)\s*(\d+)\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/i, multiplier: 60 },
+    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:hours?|hrs?|h)\b/i, multiplier: 60 },
+    { pattern: /(?:in|within|over)\s*(\d+)\s*(?:minutes?|mins?|m)\b/i, multiplier: 1 },
     // Standalone time at beginning/end (likely task duration)
-    { pattern: /^(\d+)\s*(?:h(?:our)?s?|hr?s?)\s*[-:]?\s*/i, multiplier: 60 },
-    { pattern: /^(\d+)\s*(?:min(?:ute)?s?|m)\s*[-:]?\s*/i, multiplier: 1 },
-    { pattern: /\s*[-:]\s*(\d+)\s*(?:h(?:our)?s?|hr?s?)$/i, multiplier: 60 },
-    { pattern: /\s*[-:]\s*(\d+)\s*(?:min(?:ute)?s?|m)$/i, multiplier: 1 }
+    { pattern: /^(\d+)\s*(?:hours?|hrs?|h)\s*[-:]?\s*/i, multiplier: 60 },
+    { pattern: /^(\d+)\s*(?:minutes?|mins?|m)\s*[-:]?\s*/i, multiplier: 1 },
+    { pattern: /\s*[-:]\s*(\d+)\s*(?:hours?|hrs?|h)$/i, multiplier: 60 },
+    { pattern: /\s*[-:]\s*(\d+)\s*(?:minutes?|mins?|m)$/i, multiplier: 1 }
   ];
   
   const contentDurationPatterns = [
@@ -72,8 +72,11 @@ function extractTimeDuration(title: string): { cleanTitle: string; duration?: 15
   for (const { pattern, multiplier } of taskDurationPatterns) {
     const match = title.match(pattern);
     if (match) {
-      const duration = parseInt(match[1]) * multiplier;
-      const cleanTitle = title.replace(pattern, '').replace(/\s+/g, ' ').trim();
+      // Determine if it's hours or minutes based on the matched text
+      const matchedText = match[0].toLowerCase();
+      const isHours = matchedText.includes('hour') || matchedText.includes('hr') || (matchedText.includes('h') && !matchedText.includes('m'));
+      const duration = parseInt(match[1]) * (isHours ? 60 : 1);
+      const cleanTitle = title.replace(match[0], '').replace(/\s+/g, ' ').trim();
       
       // Round to nearest valid duration
       let roundedDuration: 15 | 30 | 60;
@@ -121,20 +124,19 @@ export function categorizeTask(title: string): { workType: WorkType; duration: 1
 
   // Light work: Collaborative, communicative, or moderately engaging tasks  
   const lightWorkPatterns = [
-    // Communication & Collaboration
-    { pattern: /(call|meeting|discuss|chat|sync|standup|retrospective|demo|interview|1.?on.?1|one.?on.?one)/, workType: 'light' as WorkType },
-    { pattern: /(review|feedback|comment|edit).*(draft|document|proposal|code|design|pull\s+request|pr)/, workType: 'light' as WorkType },
-    { pattern: /(brainstorm|ideate|workshop|collaborate|pair\s+program)/, workType: 'light' as WorkType },
+    // Communication & Collaboration (meaningful interactions)
+    { pattern: /(call|meeting|discuss|chat|sync|standup|retrospective|demo|interview|1.?on.?1|one.?on.?one|brainstorm|workshop)/, workType: 'light' as WorkType },
+    { pattern: /(review|feedback|comment|edit).*(draft|document|proposal|code|design|pull\s+request|pr|creative|strategy)/, workType: 'light' as WorkType },
+    { pattern: /(collaborate|pair\s+program|mentor|coach|teach|present|pitch)/, workType: 'light' as WorkType },
     
     // Content Consumption & Light Creation
-    { pattern: /(read|reading).*(article|blog|news|update|summary|overview|newsletter|social|post)/, workType: 'light' as WorkType },
-    { pattern: /(write|post|share).*(comment|review|feedback|social|twitter|linkedin|instagram|facebook|blog\s+comment|forum\s+post|quick\s+note)/, workType: 'light' as WorkType },
-    { pattern: /(write|draft).*(email|message|brief|summary|status\s+update|quick\s+guide|outline)/, workType: 'light' as WorkType },
-    { pattern: /(prepare|setup|organize).*(meeting|presentation|workshop|demo|call)/, workType: 'light' as WorkType },
+    { pattern: /(read|reading).*(article|blog|news|update|summary|overview|newsletter|research\s+article)/, workType: 'light' as WorkType },
+    { pattern: /(write|draft|create).*(outline|summary|status\s+update|brief|quick\s+guide|social\s+post|blog\s+comment)/, workType: 'light' as WorkType },
+    { pattern: /(prepare|setup|organize).*(meeting|presentation|workshop|demo|call|training)/, workType: 'light' as WorkType },
     
     // Light creative and routine tasks
     { pattern: /(sketch|outline|wireframe|mockup|prototype|rough\s+draft)/, workType: 'light' as WorkType },
-    { pattern: /(update|modify|tweak|adjust|polish).*(design|content|copy|text|wording)/, workType: 'light' as WorkType },
+    { pattern: /(update|modify|tweak|adjust|polish).*(design|content|copy|text|wording|layout)/, workType: 'light' as WorkType },
     { pattern: /(practice|rehearse|record).*(presentation|pitch|demo|video|podcast)/, workType: 'light' as WorkType },
     
     // Learning light content
@@ -144,9 +146,10 @@ export function categorizeTask(title: string): { workType: WorkType; duration: 1
 
   // Admin work: Routine, procedural, or maintenance tasks
   const adminWorkPatterns = [
-    // Email & Communication Management
+    // Email & Communication Management (routine/transactional)
     { pattern: /(check|clear|organize|sort).*(email|emails|inbox|messages)/, workType: 'admin' as WorkType },
-    { pattern: /(respond|reply|follow.?up).*(email|message|inquiry|request)/, workType: 'admin' as WorkType },
+    { pattern: /(respond|reply|follow.?up).*(email|message|inquiry|request|airbnb|linkedin|facebook|instagram|customer|client|routine)/, workType: 'admin' as WorkType },
+    { pattern: /(reply|respond)\s+to.*(airbnb|booking|linkedin|facebook|twitter|instagram|messages|emails|inquiries)/, workType: 'admin' as WorkType },
     { pattern: /(schedule|book|calendar|reschedule|cancel).*(appointment|meeting|call|slot|time)/, workType: 'admin' as WorkType },
     
     // File & Data Management
@@ -165,7 +168,10 @@ export function categorizeTask(title: string): { workType: WorkType; duration: 1
     
     // Routine administrative tasks
     { pattern: /(order|purchase|buy|shop\s+for).*(supplies|equipment|groceries|household)/, workType: 'admin' as WorkType },
-    { pattern: /(book|reserve|cancel).*(travel|hotel|flight|restaurant|appointment)/, workType: 'admin' as WorkType }
+    { pattern: /(book|reserve|cancel).*(travel|hotel|flight|restaurant|appointment)/, workType: 'admin' as WorkType },
+    
+    // Simple message/email tasks
+    { pattern: /(send|write|draft).*(quick\s+email|brief\s+message|thank\s+you|confirmation|receipt|notification)/, workType: 'admin' as WorkType }
   ];
 
   // Check patterns in order of specificity (deep -> admin -> light)
