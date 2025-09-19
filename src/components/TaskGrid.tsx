@@ -231,34 +231,28 @@ function DraggableTask({
           )}
         </div>
         
-        {/* Duration control */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            const cycleDuration = (current: 15 | 30 | 60): 15 | 30 | 60 => {
-              if (current === 15) return 30;
-              if (current === 30) return 60;
-              return 15; // 60 -> 15
-            };
-            const newDuration = cycleDuration(task.duration);
-            
-            // Check if task needs to move to a different cell
-            if (newDuration !== task.duration) {
-              onUpdateTask(task.id, { 
-                duration: newDuration,
-                // Reset priority when moving between cells to avoid conflicts
-                priority: undefined 
-              });
-            }
-          }}
-          className="h-5 px-2 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors opacity-70 group-hover:opacity-100"
-          title="Click to change duration"
-        >
-          <Clock className="w-3 h-3 mr-1" />
-          {task.duration}m
-        </Button>
+        {/* Duration control buttons - show the two other durations */}
+        <div className="flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+          {[15, 30, 60].filter(duration => duration !== task.duration).map(duration => (
+            <Button
+              key={duration}
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateTask(task.id, { 
+                  duration: duration as 15 | 30 | 60,
+                  // Reset priority when moving between cells to avoid conflicts
+                  priority: undefined 
+                });
+              }}
+              className="h-5 px-2 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors"
+              title={`Change to ${duration} minutes`}
+            >
+              {duration}m
+            </Button>
+          ))}
+        </div>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
