@@ -3,11 +3,13 @@ import { Task, TimeSlot } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Progress } from '@/components/ui/progress';
-import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus, Star, Zap, CheckCircle } from 'lucide-react';
+import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus, Star, Zap, CheckCircle, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { DndContext, DragEndEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { toast } from 'sonner';
 
@@ -22,6 +24,7 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
   const [newBreakType, setNewBreakType] = useState<'exercise' | 'nap' | 'food' | 'meeting' | 'other'>('food');
   const [newBreakLabel, setNewBreakLabel] = useState('');
   const [startTime, setStartTime] = useState('09:00');
+  const [scheduleAffectsPlanningOrder, setScheduleAffectsPlanningOrder] = useState(false);
   // Build hours and 15-minute slots for the day
   const dayLength = 18; // hours
   const hourRows = useMemo(() => {
@@ -218,11 +221,38 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     const taskId = active.id as string;
     const overId = over.id as string;
 
-    // Reorder within same bucket by dropping over another task
     const activeTask = tasks.find((t) => t.id === taskId);
+
+    if (!activeTask) return;
+
+    // Handle time slot drops (when dropping on a time slot)
+    if (typeof overId === 'string' && overId.includes(':')) {
+      const [hour, minute] = overId.split(':').map(Number);
+      const targetTimeMinutes = hour * 60 + minute;
+      
+      // Update task with new time slot
+      const updatedTasks = tasks.map(task =>
+        task.id === taskId 
+          ? { ...task, timeSlot: new Date(2024, 0, 1, hour, minute).toISOString() }
+          : task
+      );
+      onTaskUpdate(updatedTasks);
+      
+      toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')}`);
+      return;
+    }
+
+    // Reorder within same bucket by dropping over another task
     const overTask = tasks.find((t) => t.id === overId);
 
-    if (activeTask && overTask && activeTask.id !== overTask.id && activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
+    if (activeTask && overTask && activeTask.id !== overTask.id && 
+        activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
+      
+      if (!scheduleAffectsPlanningOrder) {
+        toast.info('Enable "Affect Planning Order" to reorder tasks');
+        return;
+      }
+
       const cellTasks = tasks
         .filter((t) => t.workType === activeTask.workType && t.duration === activeTask.duration && !t.completed)
         .sort((a, b) => (a.priority || 999) - (b.priority || 999));
@@ -246,15 +276,11 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
         return t;
       });
       onTaskUpdate(updated);
+      toast.success('Task order updated');
       return;
     }
 
-    // Handle time slot moves (future enhancement)
-    if (typeof overId === 'string' && overId.includes(':')) {
-      toast.info('Task moved to ' + overId);
-    } else {
-      toast.info('Task dragged');
-    }
+    toast.info('Task dragged');
   };
 
   // Visual scale: 20px per 15 minutes
@@ -390,9 +416,20 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
             <Target className="w-5 h-5 text-primary" />
             <h3 className="text-lg font-semibold">Energy-Optimized Schedule</h3>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Start time</span>
-            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-28" />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-muted-foreground" />
+              <Label htmlFor="schedule-affects-order" className="text-sm">Affect Planning Order</Label>
+              <Switch 
+                id="schedule-affects-order"
+                checked={scheduleAffectsPlanningOrder}
+                onCheckedChange={setScheduleAffectsPlanningOrder}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Start time</span>
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="h-8 w-28" />
+            </div>
           </div>
         </div>
         <div className="relative">
@@ -421,11 +458,28 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
           <div className="pl-20">
             {timeline.segments.map((seg, i) => {
               if (seg.kind === 'gap') {
+                const gapHeight = Math.max(20, seg.duration * PX_PER_MIN); // Minimum 20px for drop targets
+                const h = Math.floor(seg.startTime / 60);
+                const m = seg.startTime % 60;
+                
                 return (
-                  <div
-                    key={`gap-${i}`}
-                    style={{ height: `${Math.max(0, seg.duration * PX_PER_MIN)}px` }}
-                  />
+                  <TimeSlotDropZone 
+                    key={`gap-${i}`} 
+                    timeSlot={`${h}:${m.toString().padStart(2, '0')}`}
+                  >
+                    <div
+                      style={{ height: `${gapHeight}px` }}
+                      className="relative group"
+                    >
+                      {gapHeight >= 40 && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-xs text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+                            Drop here for {h}:{m.toString().padStart(2, '0')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TimeSlotDropZone>
                 );
               }
 
@@ -567,8 +621,8 @@ function TimeSlotDropZone({ timeSlot, children }: { timeSlot: string; children: 
     <div
       ref={setNodeRef}
       className={cn(
-        "min-h-[40px] transition-colors",
-        isOver && "bg-primary/10 rounded"
+        "transition-colors rounded",
+        isOver && "bg-primary/10 border-2 border-primary/30 border-dashed"
       )}
     >
       {children}
