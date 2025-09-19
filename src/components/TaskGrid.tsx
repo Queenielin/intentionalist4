@@ -3,7 +3,7 @@ import { Task, TaskGroup, WorkType } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Trash2, Calendar, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Copy, Trash2, Calendar, AlertTriangle, RotateCcw, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
@@ -230,6 +230,35 @@ function DraggableTask({
             </p>
           )}
         </div>
+        
+        {/* Duration control */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            const cycleDuration = (current: 15 | 30 | 60): 15 | 30 | 60 => {
+              if (current === 15) return 30;
+              if (current === 30) return 60;
+              return 15; // 60 -> 15
+            };
+            const newDuration = cycleDuration(task.duration);
+            
+            // Check if task needs to move to a different cell
+            if (newDuration !== task.duration) {
+              onUpdateTask(task.id, { 
+                duration: newDuration,
+                // Reset priority when moving between cells to avoid conflicts
+                priority: undefined 
+              });
+            }
+          }}
+          className="h-5 px-2 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors opacity-70 group-hover:opacity-100"
+          title="Click to change duration"
+        >
+          <Clock className="w-3 h-3 mr-1" />
+          {task.duration}m
+        </Button>
         
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
