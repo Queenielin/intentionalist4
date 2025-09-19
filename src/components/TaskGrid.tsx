@@ -104,7 +104,13 @@ function DraggableTask({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id });
+  } = useSortable({ 
+    id: task.id,
+    data: {
+      type: 'task',
+      task: task
+    }
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -130,6 +136,21 @@ function DraggableTask({
           : "bg-white/20 border-white/30 hover:bg-white/30"
       )}
       onClick={(e) => onTaskClick(task, e)}
+      data-task-id={task.id}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        const draggedTaskId = e.dataTransfer.getData('text/plain');
+        const draggedTask = dayTasks.find(t => t.id === draggedTaskId);
+        
+        // If dropping a task from a group onto this individual task, ungroup it
+        if (draggedTask && draggedTask.isGrouped && draggedTask.id !== task.id) {
+          onUpdateTask(draggedTaskId, { isGrouped: false, groupId: undefined });
+        }
+      }}
     >
       <div className="flex items-center gap-2">
         
@@ -147,11 +168,34 @@ function DraggableTask({
             const isCurrentlyPriority = !!task.isPriority;
 
             if (isCurrentlyPriority) {
-              // Turn off priority but keep current position
-              onUpdateTask(task.id, { isPriority: false });
-            } else {
-              // Make priority: position below existing priority tasks in this cell
+              // Turn off priority and move to end of non-priority tasks
               const priorityTasks = cellTasks.filter((t) => t.id !== task.id && !!t.isPriority);
+              const nonPriorityTasks = cellTasks.filter((t) => t.id !== task.id && !t.isPriority);
+              
+              // Update priorities for all tasks in cell
+              priorityTasks.forEach((t, index) => {
+                onUpdateTask(t.id, { priority: index + 1 });
+              });
+              
+              // Move this task to end of non-priority section
+              nonPriorityTasks.forEach((t, index) => {
+                onUpdateTask(t.id, { priority: priorityTasks.length + index + 1 });
+              });
+              
+              onUpdateTask(task.id, { 
+                isPriority: false, 
+                priority: priorityTasks.length + nonPriorityTasks.length + 1 
+              });
+            } else {
+              // Make priority: position at end of existing priority tasks
+              const priorityTasks = cellTasks.filter((t) => t.id !== task.id && !!t.isPriority);
+              const nonPriorityTasks = cellTasks.filter((t) => t.id !== task.id && !t.isPriority);
+              
+              // Update priorities for non-priority tasks (shift them down)
+              nonPriorityTasks.forEach((t, index) => {
+                onUpdateTask(t.id, { priority: priorityTasks.length + 2 + index });
+              });
+              
               onUpdateTask(task.id, { isPriority: true, priority: priorityTasks.length + 1 });
             }
           }}
@@ -273,6 +317,25 @@ export default function TaskGrid({
       });
     }
   }, [dayTasks.length, autoGrouping]);
+
+  // Auto-assign priority to first task in 60min deep and light work cells
+  useEffect(() => {
+    WORK_TYPES.forEach(workType => {
+      if (workType === 'deep' || workType === 'light') {
+        const cellTasks = dayTasks.filter(task => 
+          task.workType === workType && 
+          task.duration === 60 && 
+          !task.completed &&
+          !task.isGrouped
+        ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
+
+        // Auto-priority the first task if no tasks have priority
+        if (cellTasks.length > 0 && !cellTasks.some(task => task.isPriority)) {
+          onUpdateTask(cellTasks[0].id, { isPriority: true, priority: 1 });
+        }
+      }
+    });
+  }, [dayTasks]);
 
   const getTasksForCell = (workType: WorkType, duration: number) => {
     return dayTasks.filter(task => 
@@ -429,23 +492,84 @@ export default function TaskGrid({
       return;
     }
 
-    const selectedIds = selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId];
+    // Handle dragging task onto a group
+    if (activeTask && taskGroups.some(g => g.id === overId)) {
+      const targetGroup = taskGroups.find(g => g.id === overId);
+      if (targetGroup && canAddTaskToGroup(targetGroup, activeTask)) {
+        // Add task to group
+        const updatedGroup = addTaskToGroup(targetGroup, activeTask);
+        setTaskGroups(prev => prev.map(g => g.id === targetGroup.id ? updatedGroup : g));
+        onUpdateTask(activeId, { isGrouped: true, groupId: targetGroup.id });
+        setSelectedTasks(new Set());
+        setActiveId(null);
+        return;
+      }
+    }
+
+    // Handle dragging task or group to a cell
+    const selectedIds = activeTask ? 
+      (selectedTasks.has(activeId) ? Array.from(selectedTasks) : [activeId]) :
+      (selectedGroups.has(activeId) ? Array.from(selectedGroups) : [activeId]);
+    
     const orderedSelectedIds = dayTasks.filter(t => selectedIds.includes(t.id)).map(t => t.id);
 
-    const buildNewOrder = (cellTasks: Task[], insertIndex: number, targetWorkType: WorkType, targetDuration: typeof DURATIONS[number]) => {
-      const filtered = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
-      const newOrderIds = [
-        ...filtered.slice(0, insertIndex).map(t => t.id),
-        ...orderedSelectedIds,
-        ...filtered.slice(insertIndex).map(t => t.id)
+    const buildNewOrder = (cellTasks: Task[], cellGroups: TaskGroup[], insertIndex: number, targetWorkType: WorkType, targetDuration: typeof DURATIONS[number]) => {
+      // Filter out selected items from current cell
+      const filteredTasks = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
+      const filteredGroups = cellGroups.filter(g => !selectedIds.includes(g.id));
+      
+      // Combine tasks and groups, maintaining their order
+      const combinedItems = [
+        ...filteredGroups.map(g => ({ type: 'group', id: g.id, priority: g.priority || 999 })),
+        ...filteredTasks.map(t => ({ type: 'task', id: t.id, priority: t.priority || 999 }))
+      ].sort((a, b) => a.priority - b.priority);
+
+      // Insert selected items at the specified index
+      const selectedItems = activeTask ? 
+        orderedSelectedIds.map(id => ({ type: 'task', id })) :
+        [{ type: 'group', id: activeId }];
+
+      const newOrder = [
+        ...combinedItems.slice(0, insertIndex),
+        ...selectedItems,
+        ...combinedItems.slice(insertIndex)
       ];
-      newOrderIds.forEach((id: string, i) => {
-        onUpdateTask(id, {
-          workType: targetWorkType,
-          duration: targetDuration,
-          scheduledDay: day,
-          priority: i + 1,
-        });
+
+      // Update priorities and properties
+      newOrder.forEach((item, i) => {
+        const newPriority = i + 1;
+        
+        if (item.type === 'task') {
+          // Check if task should auto-get priority based on position
+          const shouldBePriority = (targetWorkType === 'deep' || targetWorkType === 'light') && 
+                                   targetDuration === 60 && 
+                                   i === 0; // First position in 60min deep/light work
+          
+          onUpdateTask(item.id, {
+            workType: targetWorkType,
+            duration: targetDuration,
+            scheduledDay: day,
+            priority: newPriority,
+            isPriority: shouldBePriority || (i < newOrder.findIndex(item => 
+              item.type === 'task' && 
+              dayTasks.find(t => t.id === item.id && !t.isPriority)
+            ) && newOrder.findIndex(item => 
+              item.type === 'task' && 
+              dayTasks.find(t => t.id === item.id && t.isPriority)
+            ) !== -1)
+          });
+        } else {
+          // Update group
+          setTaskGroups(prev => prev.map(g => 
+            g.id === item.id ? {
+              ...g,
+              workType: targetWorkType,
+              duration: targetDuration,
+              scheduledDay: day,
+              priority: newPriority
+            } : g
+          ));
+        }
       });
     };
 
@@ -454,32 +578,41 @@ export default function TaskGrid({
     if (isCellTarget) {
       const { workType, duration } = parseCellId(overId);
       const targetCellTasks = getTasksForCell(workType, duration);
+      const targetCellGroups = getGroupsForCell(workType, duration);
       const droppingOnTop = overId.endsWith('-top');
-      const insertIndex = droppingOnTop ? 0 : targetCellTasks.length;
+      const insertIndex = droppingOnTop ? 0 : targetCellTasks.length + targetCellGroups.length;
 
-      buildNewOrder(targetCellTasks, insertIndex, workType, duration);
+      buildNewOrder(targetCellTasks, targetCellGroups, insertIndex, workType, duration);
       setSelectedTasks(new Set());
+      setSelectedGroups(new Set());
       setActiveId(null);
       return;
     }
 
-    // If dropped on another task, move to that task's cell and reorder (supports multi-select)
+    // If dropped on another task or group, move to that position
     if (overId !== activeId) {
       const overTask = dayTasks.find(task => task.id === overId);
-      if (overTask) {
-        const cellTasks = getTasksForCell(overTask.workType, overTask.duration);
-        const filteredCell = cellTasks.filter(t => !orderedSelectedIds.includes(t.id));
-        const overIndex = filteredCell.findIndex(task => task.id === overId);
-        const isSameCell = activeTask.workType === overTask.workType && activeTask.duration === overTask.duration;
-        const originalActiveIndex = cellTasks.findIndex(t => t.id === activeId);
-        const originalOverIndex = cellTasks.findIndex(t => t.id === overId);
-        let insertIndex = Math.max(0, overIndex);
-        if (isSameCell && originalActiveIndex !== -1 && originalOverIndex !== -1 && originalActiveIndex < originalOverIndex) {
-          insertIndex = overIndex + 1;
-        }
-        insertIndex = Math.min(insertIndex, filteredCell.length);
-        buildNewOrder(cellTasks, insertIndex, overTask.workType, overTask.duration);
+      const overGroup = taskGroups.find(group => group.id === overId);
+      
+      if (overTask || overGroup) {
+        const targetWorkType = overTask ? overTask.workType : overGroup!.workType;
+        const targetDuration = overTask ? overTask.duration : overGroup!.duration;
+        
+        const cellTasks = getTasksForCell(targetWorkType, targetDuration);
+        const cellGroups = getGroupsForCell(targetWorkType, targetDuration);
+        
+        // Find position of target item
+        const combinedItems = [
+          ...cellGroups.map(g => ({ type: 'group', id: g.id, priority: g.priority || 999 })),
+          ...cellTasks.map(t => ({ type: 'task', id: t.id, priority: t.priority || 999 }))
+        ].sort((a, b) => a.priority - b.priority);
+        
+        const overIndex = combinedItems.findIndex(item => item.id === overId);
+        const insertIndex = Math.max(0, overIndex);
+        
+        buildNewOrder(cellTasks, cellGroups, insertIndex, targetWorkType, targetDuration);
         setSelectedTasks(new Set());
+        setSelectedGroups(new Set());
       }
     }
 
@@ -696,9 +829,29 @@ export default function TaskGrid({
                                   placeholder="+ add task or drag here"
                                   className="h-8 text-xs bg-white/20 text-white placeholder:text-white/60 focus:bg-white/30"
                                   onClick={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                />
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                const draggedTaskId = e.dataTransfer.getData('text/plain');
+                                const draggedTask = dayTasks.find(t => t.id === draggedTaskId);
+                                
+                                // If dropping a grouped task onto an empty cell, ungroup it
+                                if (draggedTask && draggedTask.isGrouped) {
+                                  onUpdateTask(draggedTaskId, { 
+                                    isGrouped: false, 
+                                    groupId: undefined,
+                                    workType,
+                                    duration,
+                                    scheduledDay: day
+                                  });
+                                }
+                              }}
+                            />
                               </div>
                               
                             </div>
@@ -719,6 +872,12 @@ export default function TaskGrid({
             <div className="bg-white/30 backdrop-blur-sm border border-white/50 p-2 rounded-lg">
               <p className="text-xs font-medium text-white">
                 {draggedTask.title}
+              </p>
+            </div>
+          ) : activeId && taskGroups.find(g => g.id === activeId) ? (
+            <div className="bg-white/30 backdrop-blur-sm border border-white/50 p-2 rounded-lg">
+              <p className="text-xs font-medium text-white">
+                {taskGroups.find(g => g.id === activeId)?.title}
               </p>
             </div>
           ) : null}

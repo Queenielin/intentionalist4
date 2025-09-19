@@ -8,6 +8,7 @@ import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { canAddTaskToGroup, addTaskToGroup } from '@/utils/taskGrouping';
 
 interface TaskGroupCardProps {
   group: TaskGroup;
@@ -82,7 +83,14 @@ export default function TaskGroupCard({
 
   const togglePriority = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onUpdateGroup(group.id, { isPriority: !group.isPriority });
+    
+    if (group.isPriority) {
+      // Move group to end of non-priority items and update priorities
+      onUpdateGroup(group.id, { isPriority: false });
+    } else {
+      // Make priority
+      onUpdateGroup(group.id, { isPriority: true });
+    }
   };
 
   return (
@@ -100,6 +108,25 @@ export default function TaskGroupCard({
           : "bg-white/20 border-white/30 hover:bg-white/30"
       )}
       onClick={onClick}
+      data-group-id={group.id}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const draggedTaskId = e.dataTransfer.getData('text/plain');
+        const draggedTask = tasks.find(t => t.id === draggedTaskId);
+        
+        // If dropping a task onto this group, try to add it
+        if (draggedTask && !draggedTask.isGrouped && canAddTaskToGroup && canAddTaskToGroup(group, draggedTask)) {
+          onUpdateTask(draggedTaskId, { isGrouped: true, groupId: group.id });
+          const updatedGroup = addTaskToGroup(group, draggedTask);
+          onUpdateGroup(group.id, updatedGroup);
+        }
+      }}
     >
       {/* Group Header */}
       <div className="p-3 border-b border-white/20">
@@ -211,12 +238,18 @@ export default function TaskGroupCard({
 
       {/* Individual tasks (when expanded) */}
       {group.isExpanded && (
-        <div className="p-2 space-y-1">
+        <div className="p-2 space-y-1" data-group-expanded="true">
           {groupTasks.map((task) => (
             <div
               key={task.id}
               className="flex items-center gap-2 p-2 rounded bg-white/10 hover:bg-white/20 transition-colors"
               onClick={(e) => e.stopPropagation()}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', task.id);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              data-task-id={task.id}
             >
               {/* Task completion checkbox */}
               <div
@@ -240,11 +273,14 @@ export default function TaskGroupCard({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onRemoveTaskFromGroup(group.id, task.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveTaskFromGroup(group.id, task.id);
+                }}
                 className="h-4 w-4 p-0 text-white/50 hover:text-white/70 opacity-0 group-hover:opacity-100"
                 title="Remove from group"
               >
-                <Trash2 className="w-2.5 h-2.5" />
+                ✕
               </Button>
             </div>
           ))}
