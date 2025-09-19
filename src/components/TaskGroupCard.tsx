@@ -185,7 +185,28 @@ export default function TaskGroupCard({
           <div className="flex items-center gap-1 text-xs text-white/70">
             <span>{completedCount}/{group.taskIds.length}</span>
             <span>•</span>
-            <span>{Math.round(totalDuration)}min</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                const cycleDuration = (current: 15 | 30 | 60): 15 | 30 | 60 => {
+                  if (current === 15) return 30;
+                  if (current === 30) return 60;
+                  return 15; // 60 -> 15
+                };
+                const newDuration = cycleDuration(group.duration);
+                onUpdateGroup(group.id, { duration: newDuration });
+                
+                // Update all tasks in the group to have the same duration
+                group.taskIds.forEach(taskId => {
+                  onUpdateTask(taskId, { duration: newDuration });
+                });
+              }}
+              className="h-4 px-1 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors"
+            >
+              {Math.round(totalDuration)}min
+            </Button>
           </div>
 
           {/* Action buttons */}
@@ -260,6 +281,34 @@ export default function TaskGroupCard({
               )}>
                 {task.title}
               </span>
+
+              {/* Task duration control */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const cycleDuration = (current: 15 | 30 | 60): 15 | 30 | 60 => {
+                    if (current === 15) return 30;
+                    if (current === 30) return 60;
+                    return 15; // 60 -> 15
+                  };
+                  const newDuration = cycleDuration(task.duration);
+                  onUpdateTask(task.id, { duration: newDuration });
+                  
+                  // Also update the group duration if all tasks in group have the same duration
+                  const allTasksInGroup = tasks.filter(t => group.taskIds.includes(t.id));
+                  const allSameDuration = allTasksInGroup.every(t => 
+                    t.id === task.id ? newDuration === t.duration : newDuration === t.duration
+                  );
+                  if (allSameDuration) {
+                    onUpdateGroup(group.id, { duration: newDuration });
+                  }
+                }}
+                className="h-4 px-1 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors opacity-0 group-hover:opacity-100"
+              >
+                {task.duration}m
+              </Button>
 
               {/* Remove from group button */}
               <Button

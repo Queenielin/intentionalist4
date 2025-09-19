@@ -79,19 +79,21 @@ export default function TaskCard({ task, onUpdate, onDelete, onComplete, isDragg
 
         <div className="flex items-center gap-2 text-xs opacity-90">
           <Clock className="w-4 h-4" />
-          <Select
-            value={task.duration.toString()}
-            onValueChange={(value) => onUpdate(task.id, { duration: parseInt(value) as 15 | 30 | 60 })}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const cycleDuration = (current: 15 | 30 | 60): 15 | 30 | 60 => {
+                if (current === 15) return 30;
+                if (current === 30) return 60;
+                return 15; // 60 -> 15
+              };
+              onUpdate(task.id, { duration: cycleDuration(task.duration) });
+            }}
+            className="h-6 px-2 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors"
           >
-            <SelectTrigger className="w-16 h-6 text-xs bg-white/20 border-white/30 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15m</SelectItem>
-              <SelectItem value="30">30m</SelectItem>
-              <SelectItem value="60">60m</SelectItem>
-            </SelectContent>
-          </Select>
+            {task.duration}m
+          </Button>
         </div>
 
         <Select
