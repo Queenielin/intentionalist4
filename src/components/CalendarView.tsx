@@ -60,7 +60,10 @@ const scheduleResult = useMemo(() => {
   let scheduledItems: ScheduledItem[] = [];
   let currentTime = dayStartMinutes;
 
-  const scheduled = tasks;
+  const scheduled = tasks.filter(t => t.scheduledDay === 'today' && !t.completed);
+  console.log('All tasks:', tasks);
+  console.log('Scheduled tasks for today:', scheduled);
+  
   const BUCKETS: Array<15 | 30 | 60> = [60, 30, 15];
   const orderByBuckets = (arr: Task[]) => BUCKETS.flatMap((d) =>
     arr
@@ -70,6 +73,10 @@ const scheduleResult = useMemo(() => {
   const deepTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'deep'));
   const lightTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'light'));
   const adminTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'admin'));
+  
+  console.log('Deep tasks:', deepTasks);
+  console.log('Light tasks:', lightTasks);
+  console.log('Admin tasks:', adminTasks);
 
   const addTask = (task: Task) => {
     if (task.duration === 60) {
