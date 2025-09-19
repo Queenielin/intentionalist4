@@ -273,55 +273,114 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
           ? { ...task, timeSlot: new Date(2024, 0, 1, hour, minute).toISOString() }
           : task
       );
-      onTaskUpdate(updatedTasks);
       
-      toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')}`);
+      // If "Affect Planning Order" is enabled, reorder all tasks based on schedule
+      if (scheduleAffectsPlanningOrder) {
+        const reorderedTasks = reorderTasksBySchedule(updatedTasks);
+        onTaskUpdate(reorderedTasks);
+        toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')} and planning order updated`);
+      } else {
+        onTaskUpdate(updatedTasks);
+        toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')}`);
+      }
       return;
     }
 
     // Reorder within same bucket by dropping over another task
     const overTask = tasks.find((t) => t.id === overId);
 
-    if (activeTask && overTask && activeTask.id !== overTask.id && 
-        activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
-      
+    if (activeTask && overTask && activeTask.id !== overTask.id) {
       if (!scheduleAffectsPlanningOrder) {
         toast.info('Enable "Affect Planning Order" to reorder tasks');
         return;
       }
 
-      // Clear any existing timeSlot when reordering (return to auto-schedule)
-      const updatedTask = { ...activeTask, timeSlot: undefined };
-      
-      const cellTasks = tasks
-        .filter((t) => t.workType === activeTask.workType && t.duration === activeTask.duration && !t.completed)
-        .sort((a, b) => (a.priority || 999) - (b.priority || 999));
-      const filtered = cellTasks.filter((t) => t.id !== activeTask.id);
-      const activeIndex = cellTasks.findIndex((t) => t.id === activeTask.id);
-      const overIndex = filtered.findIndex((t) => t.id === overTask.id);
-      let insertIndex = Math.max(0, overIndex);
-      if (activeIndex !== -1 && activeIndex < cellTasks.findIndex((t) => t.id === overTask.id)) {
-        insertIndex = overIndex + 1; // moving downward -> insert after
-      }
-      const newOrderIds = [
-        ...filtered.slice(0, insertIndex).map((t) => t.id),
-        activeTask.id,
-        ...filtered.slice(insertIndex).map((t) => t.id),
-      ];
-      const updated = tasks.map((t) => {
-        const idx = newOrderIds.indexOf(t.id);
-        if (idx !== -1) {
-          const newTask = t.id === activeTask.id ? updatedTask : t;
-          return { ...newTask, priority: idx + 1 };
+      // For task-to-task drops in schedule view, we need to handle cross-bucket reordering
+      if (activeTask.workType === overTask.workType && activeTask.duration === overTask.duration) {
+        // Same bucket - simple reorder
+        const cellTasks = tasks
+          .filter((t) => t.workType === activeTask.workType && t.duration === activeTask.duration && !t.completed)
+          .sort((a, b) => (a.priority || 999) - (b.priority || 999));
+        const filtered = cellTasks.filter((t) => t.id !== activeTask.id);
+        const activeIndex = cellTasks.findIndex((t) => t.id === activeTask.id);
+        const overIndex = filtered.findIndex((t) => t.id === overTask.id);
+        let insertIndex = Math.max(0, overIndex);
+        if (activeIndex !== -1 && activeIndex < cellTasks.findIndex((t) => t.id === overTask.id)) {
+          insertIndex = overIndex + 1; // moving downward -> insert after
         }
-        return t;
-      });
-      onTaskUpdate(updated);
-      toast.success('Task order updated in planning list');
+        const newOrderIds = [
+          ...filtered.slice(0, insertIndex).map((t) => t.id),
+          activeTask.id,
+          ...filtered.slice(insertIndex).map((t) => t.id),
+        ];
+        const updated = tasks.map((t) => {
+          const idx = newOrderIds.indexOf(t.id);
+          if (idx !== -1) {
+            const newTask = t.id === activeTask.id ? { ...t, timeSlot: undefined } : t;
+            return { ...newTask, priority: idx + 1 };
+          }
+          return t;
+        });
+        onTaskUpdate(updated);
+        toast.success('Task order updated in planning list');
+      } else {
+        // Cross-bucket reordering - update global schedule order
+        const updatedTask = { ...activeTask, timeSlot: undefined };
+        const updatedTasks = tasks.map(t => t.id === activeTask.id ? updatedTask : t);
+        const reorderedTasks = reorderTasksBySchedule(updatedTasks);
+        onTaskUpdate(reorderedTasks);
+        toast.success('Task order updated across all categories');
+      }
       return;
     }
 
     toast.info('Task dragged');
+  };
+
+  // Helper function to reorder all tasks based on current schedule
+  const reorderTasksBySchedule = (taskList: Task[]) => {
+    // Get the current schedule order
+    const scheduleOrder = scheduleResult.scheduledItems
+      .filter(item => item.kind === 'task' && item.task)
+      .map(item => item.task!.id);
+    
+    // Group tasks by workType and duration to maintain grid structure
+    const tasksByCell: Record<string, Task[]> = {};
+    const todayTasks = taskList.filter(t => t.scheduledDay === 'today' && !t.completed);
+    
+    todayTasks.forEach(task => {
+      const cellKey = `${task.workType}-${task.duration}`;
+      if (!tasksByCell[cellKey]) {
+        tasksByCell[cellKey] = [];
+      }
+      tasksByCell[cellKey].push(task);
+    });
+    
+    // Reorder each cell based on schedule appearance order
+    Object.keys(tasksByCell).forEach(cellKey => {
+      const cellTasks = tasksByCell[cellKey];
+      cellTasks.sort((a, b) => {
+        const aIndex = scheduleOrder.indexOf(a.id);
+        const bIndex = scheduleOrder.indexOf(b.id);
+        
+        // If both are in schedule, sort by schedule order
+        if (aIndex !== -1 && bIndex !== -1) {
+          return aIndex - bIndex;
+        }
+        // If only one is in schedule, it comes first
+        if (aIndex !== -1) return -1;
+        if (bIndex !== -1) return 1;
+        // If neither is in schedule, maintain current order
+        return (a.priority || 999) - (b.priority || 999);
+      });
+      
+      // Update priorities within this cell
+      cellTasks.forEach((task, index) => {
+        task.priority = index + 1;
+      });
+    });
+    
+    return taskList;
   };
 
   // Visual scale: 20px per 15 minutes
