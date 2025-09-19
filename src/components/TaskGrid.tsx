@@ -495,7 +495,7 @@ export default function TaskGrid({
     // Handle dragging task onto a group
     if (activeTask && taskGroups.some(g => g.id === overId)) {
       const targetGroup = taskGroups.find(g => g.id === overId);
-      if (targetGroup && canAddTaskToGroup(targetGroup, activeTask)) {
+      if (targetGroup && canAddTaskToGroup(targetGroup, activeTask) && !activeTask.isGrouped) {
         // Add task to group
         const updatedGroup = addTaskToGroup(targetGroup, activeTask);
         setTaskGroups(prev => prev.map(g => g.id === targetGroup.id ? updatedGroup : g));
@@ -601,15 +601,34 @@ export default function TaskGrid({
         const cellTasks = getTasksForCell(targetWorkType, targetDuration);
         const cellGroups = getGroupsForCell(targetWorkType, targetDuration);
         
-        // Find position of target item
+        // Get priority tasks and groups  
+        const priorityTasks = cellTasks.filter(t => t.isPriority);
+        const priorityGroups = cellGroups.filter(g => g.isPriority);
+        const priorityCount = priorityTasks.length + priorityGroups.length;
+        
+        // Find position of target item with priority consideration
         const combinedItems = [
-          ...cellGroups.map(g => ({ type: 'group', id: g.id, priority: g.priority || 999 })),
-          ...cellTasks.map(t => ({ type: 'task', id: t.id, priority: t.priority || 999 }))
-        ].sort((a, b) => a.priority - b.priority);
+          ...cellGroups.map(g => ({ type: 'group', id: g.id, priority: g.priority || 999, isPriority: g.isPriority })),
+          ...cellTasks.map(t => ({ type: 'task', id: t.id, priority: t.priority || 999, isPriority: t.isPriority }))
+        ].sort((a, b) => {
+          // Priority items first, then by priority number
+          if (a.isPriority && !b.isPriority) return -1;
+          if (!a.isPriority && b.isPriority) return 1;
+          return a.priority - b.priority;
+        });
         
         const overIndex = combinedItems.findIndex(item => item.id === overId);
-        const insertIndex = Math.max(0, overIndex);
+        const overItem = combinedItems[overIndex];
         
+        // Determine if the task should become priority based on position
+        if (activeTask) {
+          const shouldBePriority = overIndex < priorityCount || (overItem && overItem.isPriority);
+          if (shouldBePriority !== activeTask.isPriority) {
+            onUpdateTask(activeId, { isPriority: shouldBePriority });
+          }
+        }
+        
+        const insertIndex = Math.max(0, overIndex);
         buildNewOrder(cellTasks, cellGroups, insertIndex, targetWorkType, targetDuration);
         setSelectedTasks(new Set());
         setSelectedGroups(new Set());

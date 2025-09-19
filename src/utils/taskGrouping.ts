@@ -145,7 +145,7 @@ export function createTaskGroups(tasks: Task[]): { groups: TaskGroup[]; ungroupe
           priority: Math.min(...allTasks.map(t => t.priority || 999)),
           isPriority: allTasks.some(t => t.isPriority),
           createdAt: new Date(),
-          isExpanded: false
+          isExpanded: true
         };
 
         groups.push(group);
