@@ -1,12 +1,14 @@
-import { useState } from 'react';
-import { Task, WorkType } from '@/types/task';
+import { useState, useEffect } from 'react';
+import { Task, TaskGroup, WorkType } from '@/types/task';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Trash2, Calendar, AlertTriangle } from 'lucide-react';
+import { Copy, Trash2, Calendar, AlertTriangle, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getWorkTypeColor } from '@/utils/taskAI';
 import { Input } from '@/components/ui/input';
+import { createTaskGroups, areTasksSimilar, canAddTaskToGroup, addTaskToGroup, removeTaskFromGroup } from '@/utils/taskGrouping';
+import TaskGroupCard from './TaskGroupCard';
 import {
   DndContext,
   DragEndEvent,
@@ -239,8 +241,11 @@ export default function TaskGrid({
   const [editTitle, setEditTitle] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [newTaskTitles, setNewTaskTitles] = useState<Record<string, string>>({});
+  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
+  const [autoGrouping, setAutoGrouping] = useState(true);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -253,11 +258,36 @@ export default function TaskGrid({
     day === 'today' ? !task.scheduledDay || task.scheduledDay === 'today' : task.scheduledDay === 'tomorrow'
   );
 
+  // Auto-group similar tasks
+  useEffect(() => {
+    if (autoGrouping) {
+      const uncompletedTasks = dayTasks.filter(task => !task.completed && !task.isGrouped);
+      const { groups, ungroupedTasks } = createTaskGroups(uncompletedTasks);
+      setTaskGroups(groups);
+      
+      // Mark grouped tasks
+      groups.forEach(group => {
+        group.taskIds.forEach(taskId => {
+          onUpdateTask(taskId, { isGrouped: true, groupId: group.id });
+        });
+      });
+    }
+  }, [dayTasks.length, autoGrouping]);
+
   const getTasksForCell = (workType: WorkType, duration: number) => {
     return dayTasks.filter(task => 
       task.workType === workType && 
       task.duration === duration && 
-      !task.completed
+      !task.completed &&
+      !task.isGrouped // Exclude grouped tasks from individual display
+    ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
+  };
+
+  const getGroupsForCell = (workType: WorkType, duration: number) => {
+    return taskGroups.filter(group => 
+      group.workType === workType && 
+      group.duration === duration &&
+      !group.completed
     ).sort((a, b) => (a.priority || 999) - (b.priority || 999));
   };
 
@@ -289,6 +319,17 @@ export default function TaskGrid({
     }
   };
 
+  const handleGroupClick = (group: TaskGroup, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (e?.ctrlKey || e?.metaKey) {
+      const next = new Set(selectedGroups);
+      if (next.has(group.id)) next.delete(group.id); else next.add(group.id);
+      setSelectedGroups(next);
+    } else {
+      setSelectedGroups(new Set([group.id]));
+    }
+  };
+
   const handleSaveEdit = (taskId: string) => {
     if (editTitle.trim()) {
       onUpdateTask(taskId, { title: editTitle.trim() });
@@ -303,6 +344,65 @@ export default function TaskGrid({
       setEditingTask(null);
       setEditTitle('');
     }
+  };
+
+  // Group management functions
+  const handleUpdateGroup = (groupId: string, updates: Partial<TaskGroup>) => {
+    setTaskGroups(prev => prev.map(group => 
+      group.id === groupId ? { ...group, ...updates } : group
+    ));
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    const group = taskGroups.find(g => g.id === groupId);
+    if (group) {
+      // Ungroup all tasks in this group
+      group.taskIds.forEach(taskId => {
+        onUpdateTask(taskId, { isGrouped: false, groupId: undefined });
+      });
+      setTaskGroups(prev => prev.filter(g => g.id !== groupId));
+    }
+  };
+
+  const handleDuplicateGroup = (group: TaskGroup) => {
+    // Duplicate all tasks in the group
+    const groupTasks = dayTasks.filter(task => group.taskIds.includes(task.id));
+    groupTasks.forEach(task => {
+      onDuplicateTask(task);
+    });
+  };
+
+  const handleRemoveTaskFromGroup = (groupId: string, taskId: string) => {
+    const updatedGroup = removeTaskFromGroup(taskGroups.find(g => g.id === groupId)!, taskId);
+    
+    if (updatedGroup) {
+      setTaskGroups(prev => prev.map(g => g.id === groupId ? updatedGroup : g));
+    } else {
+      // Group dissolved, remove it and ungroup remaining task
+      const group = taskGroups.find(g => g.id === groupId);
+      if (group) {
+        group.taskIds.forEach(id => {
+          onUpdateTask(id, { isGrouped: false, groupId: undefined });
+        });
+        setTaskGroups(prev => prev.filter(g => g.id !== groupId));
+      }
+    }
+    
+    // Ungroup the removed task
+    onUpdateTask(taskId, { isGrouped: false, groupId: undefined });
+  };
+
+  const toggleAutoGrouping = () => {
+    if (autoGrouping) {
+      // Disable grouping - ungroup all tasks
+      taskGroups.forEach(group => {
+        group.taskIds.forEach(taskId => {
+          onUpdateTask(taskId, { isGrouped: false, groupId: undefined });
+        });
+      });
+      setTaskGroups([]);
+    }
+    setAutoGrouping(!autoGrouping);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -320,8 +420,11 @@ export default function TaskGrid({
     const activeId = active.id as string;
     const overId = over.id as string;
 
+    // Check if dragging a task
     const activeTask = dayTasks.find(task => task.id === activeId);
-    if (!activeTask) {
+    const activeGroup = taskGroups.find(group => group.id === activeId);
+    
+    if (!activeTask && !activeGroup) {
       setActiveId(null);
       return;
     }
@@ -383,18 +486,26 @@ export default function TaskGrid({
     setActiveId(null);
   };
 
-  // Calculate total time for each work type
+  // Calculate total time for each work type (including groups)
   const getWorkTypeTotal = (workType: WorkType) => {
-    const total = dayTasks
-      .filter(task => task.workType === workType && !task.completed)
+    const taskTotal = dayTasks
+      .filter(task => task.workType === workType && !task.completed && !task.isGrouped)
       .reduce((sum, task) => sum + (task.duration / 60), 0);
-    return total;
+    
+    const groupTotal = taskGroups
+      .filter(group => group.workType === workType && !group.completed)
+      .reduce((sum, group) => sum + (group.taskIds.length * group.duration / 60), 0);
+    
+    return taskTotal + groupTotal;
   };
 
-  // Calculate total time for a specific cell
+  // Calculate total time for a specific cell (including groups)
   const getCellTotal = (workType: WorkType, duration: number) => {
     const cellTasks = getTasksForCell(workType, duration);
-    return (cellTasks.length * duration) / 60; // Convert to hours
+    const cellGroups = getGroupsForCell(workType, duration);
+    const taskTime = (cellTasks.length * duration) / 60;
+    const groupTime = cellGroups.reduce((sum, group) => sum + (group.taskIds.length * duration / 60), 0);
+    return taskTime + groupTime;
   };
 
   // Get total workload across all work types
@@ -410,7 +521,10 @@ export default function TaskGrid({
   return (
     <div 
       className="space-y-4"
-      onClick={() => setSelectedTasks(new Set())}
+      onClick={() => {
+        setSelectedTasks(new Set());
+        setSelectedGroups(new Set());
+      }}
     >
       <DndContext
         sensors={sensors}
@@ -422,16 +536,32 @@ export default function TaskGrid({
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold capitalize">{day}</h3>
             
-            {/* Research-based limits */}
-            <div className={cn(
-              "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
-              getTotalWorkload() > 8 
-                ? "bg-red-500/20 border-red-400/30"
-                : getTotalWorkload() < 4
-                ? "bg-amber-500/20 border-amber-400/30"
-                : "bg-muted border-border"
-            )}>
-              Total: {getTotalWorkload().toFixed(1)}h / 4-8h (Research Limit)
+            <div className="flex items-center gap-3">
+              {/* Auto-grouping toggle */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleAutoGrouping}
+                className={cn(
+                  "text-xs h-7",
+                  autoGrouping ? "bg-primary/20 border-primary/30" : "bg-muted/50"
+                )}
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                {autoGrouping ? 'Grouping On' : 'Grouping Off'}
+              </Button>
+              
+              {/* Research-based limits */}
+              <div className={cn(
+                "px-3 py-1 rounded-lg text-sm font-semibold border text-foreground",
+                getTotalWorkload() > 8 
+                  ? "bg-red-500/20 border-red-400/30"
+                  : getTotalWorkload() < 4
+                  ? "bg-amber-500/20 border-amber-400/30"
+                  : "bg-muted border-border"
+              )}>
+                Total: {getTotalWorkload().toFixed(1)}h / 4-8h (Research Limit)
+              </div>
             </div>
           </div>
         
@@ -468,13 +598,13 @@ export default function TaskGrid({
                 {/* Duration cells for this work type */}
                 {DURATIONS.map((duration) => {
                   const cellTasks = getTasksForCell(workType, duration);
+                  const cellGroups = getGroupsForCell(workType, duration);
                   const cellTotal = getCellTotal(workType, duration);
                   const cellId = `${workType}-${duration}`;
                   
                   return (
-                    <DroppableCell id={cellId}>
+                    <DroppableCell id={cellId} key={cellId}>
                         <Card 
-                        key={cellId}
                         className={cn(
                           "min-h-[200px] p-4 transition-all duration-200",
                           "border border-muted-foreground/20",
@@ -495,10 +625,13 @@ export default function TaskGrid({
                             )}
                           </div>
                         
-                          {/* Tasks */}
+                          {/* Groups and Tasks */}
                           <SortableContext 
                             id={cellId}
-                            items={cellTasks.map(task => task.id)}
+                            items={[
+                              ...cellGroups.map(group => group.id),
+                              ...cellTasks.map(task => task.id)
+                            ]}
                             strategy={verticalListSortingStrategy}
                           >
                             <div className="space-y-2">
@@ -506,6 +639,24 @@ export default function TaskGrid({
                               <DroppableCell id={`${cellId}-top`}>
                                 <div className="h-6 -mt-2" />
                               </DroppableCell>
+                              
+                              {/* Render Groups */}
+                              {cellGroups.map((group) => (
+                                <TaskGroupCard
+                                  key={group.id}
+                                  group={group}
+                                  tasks={dayTasks}
+                                  onUpdateGroup={handleUpdateGroup}
+                                  onDeleteGroup={handleDeleteGroup}
+                                  onDuplicateGroup={handleDuplicateGroup}
+                                  onRemoveTaskFromGroup={handleRemoveTaskFromGroup}
+                                  onUpdateTask={onUpdateTask}
+                                  isSelected={selectedGroups.has(group.id)}
+                                  onClick={(e) => handleGroupClick(group, e)}
+                                />
+                              ))}
+                              
+                              {/* Render Individual Tasks */}
                               {cellTasks.map((task, index) => (
                                 <DraggableTask
                                   key={task.id}
