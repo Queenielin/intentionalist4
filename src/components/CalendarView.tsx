@@ -61,22 +61,53 @@ const scheduleResult = useMemo(() => {
   let currentTime = dayStartMinutes;
 
   const scheduled = tasks.filter(t => t.scheduledDay === 'today' && !t.completed);
-  console.log('All tasks:', tasks);
-  console.log('Scheduled tasks for today:', scheduled);
   
+  // Separate tasks with specific time slots from auto-scheduled tasks
+  const tasksWithTimeSlots = scheduled.filter(t => t.timeSlot);
+  const tasksForAutoScheduling = scheduled.filter(t => !t.timeSlot);
+  
+  // Add manually scheduled tasks first
+  tasksWithTimeSlots.forEach(task => {
+    if (task.timeSlot) {
+      const taskTime = new Date(task.timeSlot);
+      const startTimeMinutes = taskTime.getHours() * 60 + taskTime.getMinutes();
+      
+      if (task.duration === 60) {
+        // Single 50min block for 1-hour tasks
+        scheduledItems.push({
+          kind: 'task',
+          task,
+          startTime: startTimeMinutes,
+          duration: 50
+        });
+        // Add automatic 10min break after
+        scheduledItems.push({
+          kind: 'break',
+          label: 'Break',
+          startTime: startTimeMinutes + 50,
+          duration: 10
+        });
+      } else {
+        scheduledItems.push({
+          kind: 'task',
+          task,
+          startTime: startTimeMinutes,
+          duration: task.duration
+        });
+      }
+    }
+  });
+
+  // Auto-schedule remaining tasks
   const BUCKETS: Array<15 | 30 | 60> = [60, 30, 15];
   const orderByBuckets = (arr: Task[]) => BUCKETS.flatMap((d) =>
     arr
       .filter((t) => t.duration === d)
       .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
   );
-  const deepTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'deep'));
-  const lightTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'light'));
-  const adminTasks = orderByBuckets(scheduled.filter((t) => t.workType === 'admin'));
-  
-  console.log('Deep tasks:', deepTasks);
-  console.log('Light tasks:', lightTasks);
-  console.log('Admin tasks:', adminTasks);
+  const deepTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => t.workType === 'deep'));
+  const lightTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => t.workType === 'light'));
+  const adminTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => t.workType === 'admin'));
 
   const addTask = (task: Task) => {
     if (task.duration === 60) {
@@ -235,7 +266,6 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
     // Handle time slot drops (when dropping on a time slot)
     if (typeof overId === 'string' && overId.includes(':')) {
       const [hour, minute] = overId.split(':').map(Number);
-      const targetTimeMinutes = hour * 60 + minute;
       
       // Update task with new time slot
       const updatedTasks = tasks.map(task =>
@@ -260,6 +290,9 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
         return;
       }
 
+      // Clear any existing timeSlot when reordering (return to auto-schedule)
+      const updatedTask = { ...activeTask, timeSlot: undefined };
+      
       const cellTasks = tasks
         .filter((t) => t.workType === activeTask.workType && t.duration === activeTask.duration && !t.completed)
         .sort((a, b) => (a.priority || 999) - (b.priority || 999));
@@ -278,12 +311,13 @@ const getItemsForTimeRange = (startMinutes: number, endMinutes: number) => {
       const updated = tasks.map((t) => {
         const idx = newOrderIds.indexOf(t.id);
         if (idx !== -1) {
-          return { ...t, priority: idx + 1 };
+          const newTask = t.id === activeTask.id ? updatedTask : t;
+          return { ...newTask, priority: idx + 1 };
         }
         return t;
       });
       onTaskUpdate(updated);
-      toast.success('Task order updated');
+      toast.success('Task order updated in planning list');
       return;
     }
 
