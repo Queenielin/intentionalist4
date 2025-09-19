@@ -116,16 +116,8 @@ export default function TaskGroupCard({
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        
-        const draggedTaskId = e.dataTransfer.getData('text/plain');
-        const draggedTask = tasks.find(t => t.id === draggedTaskId);
-        
-        // If dropping a task onto this group, try to add it
-        if (draggedTask && !draggedTask.isGrouped && canAddTaskToGroup && canAddTaskToGroup(group, draggedTask)) {
-          onUpdateTask(draggedTaskId, { isGrouped: true, groupId: group.id });
-          const updatedGroup = addTaskToGroup(group, draggedTask);
-          onUpdateGroup(group.id, updatedGroup);
-        }
+        // Don't handle drop here - let the main TaskGrid handle it
+        // This prevents conflicts with the dnd-kit system
       }}
     >
       {/* Group Header */}
