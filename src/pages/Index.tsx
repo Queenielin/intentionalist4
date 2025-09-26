@@ -29,7 +29,7 @@ const Index = () => {
     if (tempId) {
       setTasks(prev => prev.map(task => 
         task.id === tempId 
-          ? { ...task, workType, duration, isCategorizing, taskType }
+          ? { ...task, title, workType, duration, isCategorizing, taskType }
           : task
       ));
       
