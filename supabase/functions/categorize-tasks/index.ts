@@ -34,74 +34,88 @@ Time Estimate → 30 / 60 / 90 (minutes, rounded to nearest block)
 
 Task Type → A high-level category label so similar tasks can be grouped. (Examples: Writing, Research, Coding, Email, Meetings, Planning, Design, Review, Documentation, Learning, Chores)
 
-Always return JSON only.
+Always return JSON only. Do not include any explanation or markdown formatting.
 
 Task: "${task.title}"`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 200,
-          }
-        }),
-      });
-
-      const data = await response.json();
-      console.log('Gemini response for task:', task.title, data);
-
-      if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-        const responseText = data.candidates[0].content.parts[0].text;
+      try {
+        console.log('Calling Gemini API for task:', task.title);
         
-        try {
-          // Extract JSON from the response
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 200,
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Gemini response for task:', task.title, JSON.stringify(data, null, 2));
+
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+          const responseText = data.candidates[0].content.parts[0].text.trim();
+          console.log('Raw Gemini response text:', responseText);
+          
+          // Clean the response text and extract JSON
+          let cleanedText = responseText;
+          
+          // Remove markdown code blocks if present
+          cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+          
+          // Find JSON object
+          const jsonMatch = cleanedText.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
+          
           if (jsonMatch) {
             const classification = JSON.parse(jsonMatch[0]);
+            console.log('Parsed classification:', classification);
             
             // Map Gemini response to our format
             let workType: 'deep' | 'light' | 'admin' = 'light';
             if (classification.work_depth === 'Deep Work') workType = 'deep';
             else if (classification.work_depth === 'Admin Work') workType = 'admin';
+            else if (classification.work_depth === 'Light Work') workType = 'light';
             
             let duration: 15 | 30 | 60 = 30;
-            if (classification.time_estimate === '30') duration = 30;
-            else if (classification.time_estimate === '60') duration = 60;
-            else if (classification.time_estimate === '90') duration = 60; // Cap at 60
+            const timeEstimate = parseInt(classification.time_estimate);
+            if (timeEstimate === 30) duration = 30;
+            else if (timeEstimate === 60) duration = 60;
+            else if (timeEstimate === 90) duration = 60; // Cap at 60
 
             categorizedTasks.push({
               ...task,
+              id: task.id || `task-${Date.now()}-${Math.random()}`,
               workType,
               duration,
               taskType: classification.task_type || 'General'
             });
+            
+            console.log('Successfully categorized task:', task.title, 'as', workType, duration, classification.task_type);
           } else {
-            throw new Error('No valid JSON found in response');
+            throw new Error(`No valid JSON found in Gemini response: ${responseText}`);
           }
-        } catch (parseError) {
-          console.error('Error parsing Gemini response:', parseError, responseText);
-          // Fallback to default categorization
-          categorizedTasks.push({
-            ...task,
-            workType: task.workType || 'light',
-            duration: task.duration || 30,
-            taskType: 'General'
-          });
+        } else {
+          throw new Error(`Invalid Gemini API response structure: ${JSON.stringify(data)}`);
         }
-      } else {
-        console.error('Unexpected Gemini API response structure:', data);
-        // Fallback to default categorization
+      } catch (error) {
+        console.error('Error processing task with Gemini:', task.title, error);
+        // Fallback to original task properties
         categorizedTasks.push({
           ...task,
+          id: task.id || `task-${Date.now()}-${Math.random()}`,
           workType: task.workType || 'light',
           duration: task.duration || 30,
           taskType: 'General'
