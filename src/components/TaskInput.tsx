@@ -44,11 +44,11 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
         // Try streaming first for multiple tasks
         if (taskTitles.length > 1) {
           try {
-            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/categorize-tasks`, {
+            const response = await fetch(`https://kerstiyewadsqwkvrafq.supabase.co/functions/v1/categorize-tasks`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlcnN0aXlld2Fkc3F3a3ZyYWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5MjgxNDksImV4cCI6MjA3MzUwNDE0OX0.A7r5gtYbJfRaAZlubv8ivUq1R2262PaRED9DnJVhgH8`,
               },
               body: JSON.stringify({ tasks: taskTitles, stream: true }),
             });
