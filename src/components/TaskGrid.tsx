@@ -20,28 +20,24 @@ const WORK_TYPE_CONFIG = {
   deep: {
     title: 'Deep Work',
     subcategories: [
-      'Strategy & Problem-Solving',
-      'Creative Production', 
-      'Research & Learning',
-      'Building & Designing'
+      'Analytical × Strategic',
+      'Creative × Generative',
+      'Learning × Absorptive',
+      'Constructive × Building'
     ]
   },
   light: {
     title: 'Light Work',
     subcategories: [
-      'Communication',
-      'Review & Feedback',
-      'Organizing & Planning', 
-      'Follow-Ups & Coordination'
+      'Social & Relational',
+      'Critical & Structuring'
     ]
   },
   admin: {
     title: 'Admin',
     subcategories: [
-      'Documentation & Data Entry',
-      'Scheduling & Calendar',
-      'File & Tool Maintenance',
-      'Routine Operations'
+      'Clerical & Admin Routines',
+      'Logistics & Maintenance'
     ]
   }
 } as const;
@@ -95,16 +91,16 @@ export default function TaskGrid({
         </div>
       </div>
 
-      <div className="space-y-4">
-        {/* Column headers */}
-        <div className="grid grid-cols-4 gap-4">
-          <div></div> {/* Empty cell for row labels */}
-          {WORK_TYPES.map((workType) => {
-            const config = WORK_TYPE_CONFIG[workType];
-            const workTypeTasks = dayTasks.filter(task => task.workType === workType && !task.completed);
-            
-            return (
-              <div key={workType} className="text-center p-3 rounded-lg bg-muted/50">
+      {/* Work type columns */}
+      <div className="grid grid-cols-3 gap-6">
+        {WORK_TYPES.map((workType) => {
+          const config = WORK_TYPE_CONFIG[workType];
+          const workTypeTasks = dayTasks.filter(task => task.workType === workType && !task.completed);
+          
+          return (
+            <div key={workType} className="space-y-4">
+              {/* Column header */}
+              <div className="text-center p-3 rounded-lg bg-muted/50">
                 <h3 className="text-sm font-semibold capitalize text-foreground">
                   {config.title}
                 </h3>
@@ -112,55 +108,35 @@ export default function TaskGrid({
                   {workTypeTasks.length} tasks
                 </Badge>
               </div>
-            );
-          })}
-        </div>
 
-        {/* Grid rows */}
-        {allSubcategories.map((subcategory) => {
-          // Determine which work type this subcategory belongs to
-          const workType = WORK_TYPES.find(wt => {
-            const config = WORK_TYPE_CONFIG[wt];
-            return config.subcategories.some(sub => sub === subcategory);
-          });
-          
-          if (!workType) return null;
+              {/* Subcategory cards */}
+              <div className="space-y-3">
+                {config.subcategories.map((subcategory) => {
+                  const cellTasks = getTasksForCell(workType, subcategory);
+                  const cellTotal = getCellTotal(workType, subcategory);
 
-          return (
-            <div key={subcategory} className="grid grid-cols-4 gap-4">
-              {/* Row label */}
-              <div className="flex items-center p-3 text-sm font-medium text-muted-foreground bg-muted/30 rounded-lg">
-                <div className="truncate" title={subcategory}>
-                  {subcategory}
-                </div>
-              </div>
-
-              {/* Cells for each work type */}
-              {WORK_TYPES.map((cellWorkType) => {
-                const isCorrectColumn = cellWorkType === workType;
-                const cellTasks = isCorrectColumn ? getTasksForCell(cellWorkType, subcategory) : [];
-                const cellTotal = isCorrectColumn ? getCellTotal(cellWorkType, subcategory) : 0;
-                const cellId = `${cellWorkType}-${subcategory}`;
-
-                return (
-                  <Card 
-                    key={cellWorkType}
-                    className={cn(
-                      "min-h-[150px] p-3 transition-all duration-200",
-                      "border border-muted-foreground/20",
-                      isCorrectColumn 
-                        ? cn("hover:border-muted-foreground/40", getWorkTypeColor(cellWorkType))
-                        : "bg-muted/10 opacity-30",
-                    )}
-                  >
-                    {isCorrectColumn ? (
-                      <div className="space-y-2">
-                        {/* Cell header */}
-                        {cellTotal > 0 && (
-                          <div className="text-center text-xs text-white/70">
-                            {cellTotal.toFixed(1)}h total
-                          </div>
-                        )}
+                  return (
+                    <Card 
+                      key={subcategory}
+                      className={cn(
+                        "min-h-[180px] p-4 transition-all duration-200",
+                        "border border-muted-foreground/20",
+                        "hover:border-muted-foreground/40", 
+                        getWorkTypeColor(workType)
+                      )}
+                    >
+                      <div className="space-y-3">
+                        {/* Subcategory header */}
+                        <div className="text-center">
+                          <h4 className="text-sm font-medium text-white/90 mb-1">
+                            {subcategory}
+                          </h4>
+                          {cellTotal > 0 && (
+                            <div className="text-xs text-white/70">
+                              {cellTotal.toFixed(1)}h total
+                            </div>
+                          )}
+                        </div>
 
                         {/* Tasks */}
                         <div className="space-y-2">
@@ -182,7 +158,7 @@ export default function TaskGrid({
                               if (e.key === 'Enter') {
                                 const title = (e.target as HTMLInputElement).value.trim();
                                 if (title) {
-                                  onAddTask(title, cellWorkType, 30, day);
+                                  onAddTask(title, workType, 30, day);
                                   (e.target as HTMLInputElement).value = '';
                                 }
                               }
@@ -190,14 +166,10 @@ export default function TaskGrid({
                           />
                         </div>
                       </div>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground/50">
-                        N/A
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
