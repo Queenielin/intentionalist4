@@ -122,18 +122,31 @@ Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
     classifications = JSON.parse(cleanText);
   } catch {
     classifications = tasks.map(() => ({
-      workType: 'light', duration: 30, taskType: 'Other', groupingKey: 'Other:General'
+      workType: 'light', duration: 30, taskType: 'Social & Relational', groupingKey: 'Light:Social & Relational'
     }));
   }
 
-  // Validate classifications
+  // Validate classifications and normalize field names
   const validWorkTypes = ['deep', 'light', 'admin'];
   const validDurations = [15, 30, 60];
   
-  return classifications.map((c: any) => ({
-    workType: validWorkTypes.includes(c.workType) ? c.workType : 'light',
-    duration: validDurations.includes(c.duration) ? c.duration : 30,
-    taskType: c.taskType || 'Other',
-    groupingKey: c.groupingKey || 'Other:General'
-  }));
+  const validSubcategories = [
+    'Analytical × Strategic', 'Creative × Generative', 'Learning × Absorptive', 'Constructive × Building',
+    'Social & Relational', 'Critical & Structuring',
+    'Clerical & Admin Routines', 'Logistics & Maintenance'
+  ];
+  
+  return classifications.map((c: any) => {
+    const workType = validWorkTypes.includes(c.workType) ? c.workType : 'light';
+    const taskType = validSubcategories.includes(c.taskType) ? c.taskType : 'Social & Relational';
+    
+    console.log(`Task classification: workType=${workType}, taskType=${taskType}`);
+    
+    return {
+      workType,
+      duration: validDurations.includes(c.duration) ? c.duration : 30,
+      taskType,
+      groupingKey: `${workType}:${taskType}`
+    };
+  });
 }
