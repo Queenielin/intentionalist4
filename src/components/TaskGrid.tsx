@@ -1,7 +1,10 @@
 import { Task, WorkType } from '@/types/task';
-import SubcategoryTaskList from './SubcategoryTaskList';
+import TaskCard from './TaskCard';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { getWorkTypeColor } from '@/utils/taskAI';
 
 interface TaskGridProps {
   tasks: Task[];
@@ -16,7 +19,6 @@ interface TaskGridProps {
 const WORK_TYPE_CONFIG = {
   deep: {
     title: 'Deep Work',
-    color: 'bg-blue-500/10 border-blue-200 dark:border-blue-800',
     subcategories: [
       'Strategy & Problem-Solving',
       'Creative Production', 
@@ -26,7 +28,6 @@ const WORK_TYPE_CONFIG = {
   },
   light: {
     title: 'Light Work',
-    color: 'bg-green-500/10 border-green-200 dark:border-green-800',
     subcategories: [
       'Communication',
       'Review & Feedback',
@@ -36,7 +37,6 @@ const WORK_TYPE_CONFIG = {
   },
   admin: {
     title: 'Admin',
-    color: 'bg-yellow-500/10 border-yellow-200 dark:border-yellow-800',
     subcategories: [
       'Documentation & Data Entry',
       'Scheduling & Calendar',
@@ -45,6 +45,8 @@ const WORK_TYPE_CONFIG = {
     ]
   }
 } as const;
+
+const WORK_TYPES: WorkType[] = ['deep', 'light', 'admin'];
 
 export default function TaskGrid({ 
   tasks, 
@@ -57,6 +59,26 @@ export default function TaskGrid({
 }: TaskGridProps) {
   const dayTasks = tasks.filter(task => task.scheduledDay === day);
   
+  // Get all unique subcategories in order
+  const allSubcategories = [
+    ...WORK_TYPE_CONFIG.deep.subcategories,
+    ...WORK_TYPE_CONFIG.light.subcategories,
+    ...WORK_TYPE_CONFIG.admin.subcategories,
+  ];
+
+  const getTasksForCell = (workType: WorkType, subcategory: string) => {
+    return dayTasks.filter(task => 
+      task.workType === workType && 
+      task.taskType === subcategory && 
+      !task.completed
+    );
+  };
+
+  const getCellTotal = (workType: WorkType, subcategory: string) => {
+    const cellTasks = getTasksForCell(workType, subcategory);
+    return cellTasks.reduce((sum, task) => sum + (task.duration / 60), 0);
+  };
+
   if (dayTasks.length === 0) {
     return (
       <Card className="p-8 text-center bg-muted/30 border-dashed border-2">
@@ -82,59 +104,109 @@ export default function TaskGrid({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {(Object.keys(WORK_TYPE_CONFIG) as WorkType[]).map(workType => {
-          const config = WORK_TYPE_CONFIG[workType];
-          const workTypeTasks = dayTasks.filter(task => task.workType === workType);
-          
-          return (
-            <div key={workType} className={`rounded-lg border-2 ${config.color} p-4`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{config.title}</h3>
-                <Badge variant="secondary" className="text-xs">
-                  {workTypeTasks.filter(t => !t.completed).length}
+      <div className="space-y-4">
+        {/* Column headers */}
+        <div className="grid grid-cols-4 gap-4">
+          <div></div> {/* Empty cell for row labels */}
+          {WORK_TYPES.map((workType) => {
+            const config = WORK_TYPE_CONFIG[workType];
+            const workTypeTasks = dayTasks.filter(task => task.workType === workType && !task.completed);
+            
+            return (
+              <div key={workType} className="text-center p-3 rounded-lg bg-muted/50">
+                <h3 className="text-sm font-semibold capitalize text-foreground">
+                  {config.title}
+                </h3>
+                <Badge variant="secondary" className="text-xs mt-1">
+                  {workTypeTasks.length} tasks
                 </Badge>
               </div>
+            );
+          })}
+        </div>
 
-              <div className="space-y-4">
-                {config.subcategories.map(subcategory => {
-                  const subcategoryTasks = workTypeTasks.filter(task => 
-                    task.taskType === subcategory
-                  );
-                  
-                  return (
-                    <div key={subcategory} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-muted-foreground">
-                          {subcategory}
-                        </h4>
-                        {subcategoryTasks.length > 0 && (
-                          <Badge variant="outline" className="text-xs h-5">
-                            {subcategoryTasks.length}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      {subcategoryTasks.length > 0 ? (
-                        <SubcategoryTaskList
-                          tasks={subcategoryTasks}
-                          groupTitle={subcategory}
-                          workType={workType}
-                          onUpdateTask={onUpdateTask}
-                          onDeleteTask={onDeleteTask}
-                          onDuplicateTask={onDuplicateTask}
-                          onCompleteTask={onCompleteTask}
-                          onAddTask={onAddTask}
-                        />
-                      ) : (
-                        <div className="p-3 border-2 border-dashed border-muted-foreground/20 rounded-lg text-center text-xs text-muted-foreground">
-                          No tasks yet
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+        {/* Grid rows */}
+        {allSubcategories.map((subcategory) => {
+          // Determine which work type this subcategory belongs to
+          const workType = WORK_TYPES.find(wt => {
+            const config = WORK_TYPE_CONFIG[wt];
+            return config.subcategories.some(sub => sub === subcategory);
+          });
+          
+          if (!workType) return null;
+
+          return (
+            <div key={subcategory} className="grid grid-cols-4 gap-4">
+              {/* Row label */}
+              <div className="flex items-center p-3 text-sm font-medium text-muted-foreground bg-muted/30 rounded-lg">
+                <div className="truncate" title={subcategory}>
+                  {subcategory}
+                </div>
               </div>
+
+              {/* Cells for each work type */}
+              {WORK_TYPES.map((cellWorkType) => {
+                const isCorrectColumn = cellWorkType === workType;
+                const cellTasks = isCorrectColumn ? getTasksForCell(cellWorkType, subcategory) : [];
+                const cellTotal = isCorrectColumn ? getCellTotal(cellWorkType, subcategory) : 0;
+                const cellId = `${cellWorkType}-${subcategory}`;
+
+                return (
+                  <Card 
+                    key={cellWorkType}
+                    className={cn(
+                      "min-h-[150px] p-3 transition-all duration-200",
+                      "border border-muted-foreground/20",
+                      isCorrectColumn 
+                        ? cn("hover:border-muted-foreground/40", getWorkTypeColor(cellWorkType))
+                        : "bg-muted/10 opacity-30",
+                    )}
+                  >
+                    {isCorrectColumn ? (
+                      <div className="space-y-2">
+                        {/* Cell header */}
+                        {cellTotal > 0 && (
+                          <div className="text-center text-xs text-white/70">
+                            {cellTotal.toFixed(1)}h total
+                          </div>
+                        )}
+
+                        {/* Tasks */}
+                        <div className="space-y-2">
+                          {cellTasks.map((task) => (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onUpdate={onUpdateTask}
+                              onDelete={onDeleteTask}
+                              onComplete={onCompleteTask}
+                            />
+                          ))}
+
+                          {/* Add task input */}
+                          <Input
+                            placeholder={`Add ${subcategory.toLowerCase()} task...`}
+                            className="text-xs bg-white/20 border-white/30 text-white placeholder:text-white/50"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const title = (e.target as HTMLInputElement).value.trim();
+                                if (title) {
+                                  onAddTask(title, cellWorkType, 30, day);
+                                  (e.target as HTMLInputElement).value = '';
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground/50">
+                        N/A
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           );
         })}
