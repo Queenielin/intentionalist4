@@ -10,7 +10,7 @@ export function parseTaskInput(input: string): Array<{ title: string; workType: 
 }
 
 // Break down input into individual tasks
-function breakDownTasks(input: string): string[] {
+export function breakDownTasks(input: string): string[] {
   const trimmed = input.trim();
   
   // Check for list patterns

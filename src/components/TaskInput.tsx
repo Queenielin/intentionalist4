@@ -3,7 +3,9 @@ import { Plus } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { parseTaskInput } from '@/utils/taskAI';
+import { breakDownTasks } from '@/utils/taskAI';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface TaskInputProps {
   onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60) => void;
@@ -11,14 +13,61 @@ interface TaskInputProps {
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [taskTitle, setTaskTitle] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (taskTitle.trim()) {
-      const tasks = parseTaskInput(taskTitle);
-      tasks.forEach(({ title, workType, duration }) => {
-        onAddTask(title, workType, duration);
-      });
-      setTaskTitle('');
+      setIsProcessing(true);
+      try {
+        // Break down the input into individual task titles
+        const taskTitles = breakDownTasks(taskTitle);
+        
+        // Call the categorize-tasks edge function
+        const { data, error } = await supabase.functions.invoke('categorize-tasks', {
+          body: { tasks: taskTitles }
+        });
+
+        if (error) {
+          console.error('Error categorizing tasks:', error);
+          toast({
+            title: "Categorization failed",
+            description: "Using fallback categorization",
+            variant: "destructive"
+          });
+          // Fallback to local parsing
+          const { parseTaskInput } = await import('@/utils/taskAI');
+          const fallbackTasks = parseTaskInput(taskTitle);
+          fallbackTasks.forEach(({ title, workType, duration }) => {
+            onAddTask(title, workType, duration);
+          });
+        } else {
+          const { classifications } = data;
+          // Add each classified task
+          taskTitles.forEach((title, index) => {
+            const classification = classifications[index];
+            onAddTask(title, classification.workType, classification.duration);
+            
+            // Show classification result
+            toast({
+              title: "Task categorized",
+              description: `"${title}" → ${classification.taskType} (${classification.workType} work, ${classification.duration} min)`,
+              duration: 2000
+            });
+          });
+        }
+        
+        setTaskTitle('');
+      } catch (error) {
+        console.error('Error adding tasks:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add tasks. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -42,11 +91,11 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
         />
         <Button 
           onClick={handleAddTask}
-          disabled={!taskTitle.trim()}
+          disabled={!taskTitle.trim() || isProcessing}
           className="h-12 px-6 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg hover:shadow-xl focus-ring"
         >
           <Plus className="w-5 h-5 mr-2" />
-          Add Task
+          {isProcessing ? 'Categorizing...' : 'Add Task'}
         </Button>
       </div>
       <p className="text-sm text-muted-foreground mt-3 text-center">
