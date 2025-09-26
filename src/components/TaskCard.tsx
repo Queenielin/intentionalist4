@@ -71,9 +71,21 @@ export default function TaskCard({ task, onUpdate, onDelete, onComplete, isDragg
               autoFocus
             />
           ) : (
-            <p className={cn("font-medium text-sm", task.completed && "line-through opacity-70")}>
-              {task.title}
-            </p>
+            <div>
+              <p className={cn("font-medium text-sm", task.completed && "line-through opacity-70")}>
+                {task.title}
+                {task.isCategorizing && (
+                  <span className="ml-2 text-xs opacity-75 animate-pulse">
+                    Categorizing...
+                  </span>
+                )}
+              </p>
+              {task.taskType && !task.isCategorizing && (
+                <p className="text-xs opacity-75 mt-1">
+                  {task.taskType}
+                </p>
+              )}
+            </div>
           )}
         </div>
 

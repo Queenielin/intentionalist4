@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { tasks } = await req.json();
+    const { tasks, stream = false } = await req.json();
     console.log('Received tasks for classification:', tasks);
 
     if (!tasks || !Array.isArray(tasks)) {
@@ -25,166 +25,45 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not set');
     }
 
-    // Create prompt for batch processing
-    const prompt = `You are an advanced task classifier for a productivity system. Given task titles, return a JSON array with objects containing:
-- workType: one of ["deep","light","admin"] (lowercase only)
-- duration: one of [15,30,60] (minutes, integer)
-- taskType: specific subcategory based on cognitive type required
-- groupingKey: short label used to group similar tasks (e.g., "Email:Support", "Strategy:ProductRoadmap")
-
-WORK TYPE DEFINITIONS:
-
-🔵 DEEP WORK | Focused × High-Value × Cognitively Demanding
-Work requiring full concentration, no distractions, producing high-value output through problem-solving, creativity, or analysis.
-Subcategories (taskType options):
-- "Strategy" → Business strategy, analysis, financial modeling, decision frameworks
-- "Creative" → Writing, design, coding, music, content creation  
-- "Research" → Reading, studying, synthesizing knowledge, data exploration
-- "Building" → Product design, system architecture, prototyping, solution mapping
-
-🟢 LIGHT WORK | Execution × Low-Depth × Medium Value
-Work requiring some focus but not deep concentration; routine tasks applying existing knowledge.
-Subcategories (taskType options):
-- "Communication" → Emails, chat replies, drafting short updates, responding to inquiries
-- "Review" → Reviewing documents, slide decks, pull requests, proofreading
-- "Organizing" → Updating task boards, making short plans, simple scheduling
-- "Coordination" → Follow-ups, aligning with colleagues, preparing reminders
-
-🟡 ADMIN WORK | Maintenance × Low Cognitive Demand × Organizational  
-Necessary support tasks that keep systems running but don't produce high-value creative output.
-Subcategories (taskType options):
-- "Documentation" → Logging notes, updating CRM, form filling, timesheets
-- "Scheduling" → Booking/rescheduling meetings, time-blocking
-- "FileManagement" → Uploading files, renaming, organizing folders, backups
-- "Operations" → Expense reports, invoice processing, compliance checklists
-
-DURATION ASSIGNMENT RULES:
-
-⚡ 15-MINUTE TASKS | Quick × Low Complexity × High Context-Switch Tolerance
-Small, atomic tasks completed in one go with little prep:
-- Replying to 3-5 emails
-- Quick calendar reschedule  
-- Sending reminder/follow-up message
-- Reviewing short document for typos
-- Simple data entry
-
-⏳ 30-MINUTE TASKS | Medium Depth × Moderate Focus × Self-Contained
-Work requiring moderate focus, finished in one sitting:
-- Drafting LinkedIn post or short update
-- Creating 2-3 presentation slides
-- Reviewing and commenting on short proposal
-- Testing software feature
-- Writing meeting notes summary
-
-🎯 60-MINUTE TASKS | Deep × High Focus × Complex Output
-Sustained deep focus producing tangible output:
-- Writing 2-3 page report section
-- Coding feature or debugging workflow
-- Designing product flow
-- Research and synthesis
-- Strategy presentation prep
-
-SPECIAL RULES:
-1) If task appears to need >1 hour, still assign 60 minutes but add "Block 1" to groupingKey
-2) Never use "General" - always pick specific subcategory
-3) For batch tasks (multiple emails, etc.), estimate total time and categorize accordingly
-
-Return only a JSON array with one object per task, in the same order. No explanations.
-
-Tasks to classify:
-${tasks.map((task: string, index: number) => `${index + 1}. ${task}`).join('\n')}`;
-
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-goog-api-key': GEMINI_API_KEY,
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2048,
+    // For streaming, process tasks individually
+    if (stream && tasks.length > 1) {
+      const encoder = new TextEncoder();
+      const readableStream = new ReadableStream({
+        async start(controller) {
+          try {
+            for (let i = 0; i < tasks.length; i++) {
+              const singleTask = [tasks[i]];
+              const classification = await classifyTasks(singleTask, GEMINI_API_KEY);
+              
+              const result = {
+                index: i,
+                task: tasks[i],
+                classification: classification[0]
+              };
+              
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify(result)}\n\n`));
+            }
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
         }
-      }),
-    });
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      return new Response(readableStream, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
     }
 
-    const data = await response.json();
-    console.log('Gemini response:', data);
-
-    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response from Gemini API');
-    }
-
-    const responseText = data.candidates[0].content.parts[0].text.trim();
-    console.log('Gemini response text:', responseText);
-
-    // Parse the JSON response
-    let classifications;
-    try {
-      // Remove any markdown code blocks if present
-      const cleanText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      classifications = JSON.parse(cleanText);
-    } catch (parseError) {
-      console.error('Failed to parse Gemini response:', parseError);
-      console.error('Response text:', responseText);
-      
-      // Fallback to default classifications
-      classifications = tasks.map(() => ({
-        workType: 'light',
-        duration: 30,
-        taskType: 'Other',
-        groupingKey: 'Other:General'
-      }));
-    }
-
-    // Ensure we have the right number of classifications
-    if (!Array.isArray(classifications) || classifications.length !== tasks.length) {
-      console.warn('Classification count mismatch, using defaults');
-      classifications = tasks.map(() => ({
-        workType: 'light',
-        duration: 30,
-        taskType: 'Other',
-        groupingKey: 'Other:General'
-      }));
-    }
-
-    // Validate and sanitize each classification
-    const validatedClassifications = classifications.map((classification: any, index: number) => {
-      const validWorkTypes = ['deep', 'light', 'admin'];
-      const validDurations = [15, 30, 60];
-      const validTaskTypes = [
-        // Deep Work subcategories
-        'Strategy', 'Creative', 'Research', 'Building',
-        // Light Work subcategories  
-        'Communication', 'Review', 'Organizing', 'Coordination',
-        // Admin Work subcategories
-        'Documentation', 'Scheduling', 'FileManagement', 'Operations',
-        // Legacy fallback
-        'Other'
-      ];
-
-      return {
-        workType: validWorkTypes.includes(classification.workType) ? classification.workType : 'light',
-        duration: validDurations.includes(classification.duration) ? classification.duration : 30,
-        taskType: validTaskTypes.includes(classification.taskType) ? classification.taskType : 'Other',
-        groupingKey: classification.groupingKey || 'Other:General'
-      };
-    });
-
-    console.log('Final classifications:', validatedClassifications);
-
-    return new Response(JSON.stringify({ classifications: validatedClassifications }), {
+    // For non-streaming, process all tasks at once
+    const classifications = await classifyTasks(tasks, GEMINI_API_KEY);
+    
+    return new Response(JSON.stringify({ classifications }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
@@ -197,3 +76,60 @@ ${tasks.map((task: string, index: number) => `${index + 1}. ${task}`).join('\n')
     });
   }
 });
+
+// Extracted classification logic
+async function classifyTasks(tasks: string[], apiKey: string) {
+  const prompt = `You are an advanced task classifier. Return JSON array with objects containing:
+- workType: one of ["deep","light","admin"] 
+- duration: one of [15,30,60]
+- taskType: specific subcategory
+- groupingKey: short label for grouping
+
+WORK TYPES:
+🔵 DEEP: Strategy, Creative, Research, Building
+🟢 LIGHT: Communication, Review, Organizing, Coordination  
+🟡 ADMIN: Documentation, Scheduling, FileManagement, Operations
+
+DURATIONS:
+⚡ 15min: Quick tasks (emails, updates)
+⏳ 30min: Medium focus (drafts, reviews)
+🎯 60min: Deep focus (reports, coding)
+
+Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
+
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-8b:generateContent', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+    }),
+  });
+
+  const data = await response.json();
+  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  
+  let classifications;
+  try {
+    const cleanText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    classifications = JSON.parse(cleanText);
+  } catch {
+    classifications = tasks.map(() => ({
+      workType: 'light', duration: 30, taskType: 'Other', groupingKey: 'Other:General'
+    }));
+  }
+
+  // Validate classifications
+  const validWorkTypes = ['deep', 'light', 'admin'];
+  const validDurations = [15, 30, 60];
+  
+  return classifications.map((c: any) => ({
+    workType: validWorkTypes.includes(c.workType) ? c.workType : 'light',
+    duration: validDurations.includes(c.duration) ? c.duration : 30,
+    taskType: c.taskType || 'Other',
+    groupingKey: c.groupingKey || 'Other:General'
+  }));
+}

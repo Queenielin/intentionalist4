@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface TaskInputProps {
-  onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60) => void;
+  onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60, isCategorizing?: boolean, tempId?: string, taskType?: string) => void;
 }
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
@@ -23,41 +23,104 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
         // Break down the input into individual task titles
         const taskTitles = breakDownTasks(taskTitle);
         
-        // Call the categorize-tasks edge function
+        // Add tasks immediately with "categorizing" status
+        const tempTaskIds: string[] = [];
+        taskTitles.forEach((title) => {
+          const tempId = `temp-${Date.now()}-${Math.random()}`;
+          tempTaskIds.push(tempId);
+          onAddTask(title, 'light', 30, true, tempId); // Add with categorizing flag
+        });
+
+        // Show immediate feedback
+        toast({
+          title: "Tasks added",
+          description: `${taskTitles.length} task(s) added and categorizing...`,
+          duration: 2000
+        });
+
+        setTaskTitle('');
+        setIsProcessing(false);
+
+        // Try streaming first for multiple tasks
+        if (taskTitles.length > 1) {
+          try {
+            const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/categorize-tasks`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              },
+              body: JSON.stringify({ tasks: taskTitles, stream: true }),
+            });
+
+            if (response.body) {
+              const reader = response.body.getReader();
+              const decoder = new TextDecoder();
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const data = JSON.parse(line.slice(6));
+                    const { index, classification } = data;
+                    
+                    // Update the specific task with AI classification
+                    onAddTask(
+                      taskTitles[index], 
+                      classification.workType, 
+                      classification.duration, 
+                      false, // Remove categorizing flag
+                      tempTaskIds[index], // Use temp ID to update existing task
+                      classification.taskType
+                    );
+
+                    toast({
+                      title: "Task updated",
+                      description: `"${taskTitles[index]}" → ${classification.taskType}`,
+                      duration: 1500
+                    });
+                  }
+                }
+              }
+              return;
+            }
+          } catch (streamError) {
+            console.log('Streaming failed, falling back to batch:', streamError);
+          }
+        }
+
+        // Fallback to batch processing
         const { data, error } = await supabase.functions.invoke('categorize-tasks', {
           body: { tasks: taskTitles }
         });
 
         if (error) {
           console.error('Error categorizing tasks:', error);
-          toast({
-            title: "Categorization failed",
-            description: "Using fallback categorization",
-            variant: "destructive"
-          });
-          // Fallback to local parsing
-          const { parseTaskInput } = await import('@/utils/taskAI');
-          const fallbackTasks = parseTaskInput(taskTitle);
-          fallbackTasks.forEach(({ title, workType, duration }) => {
-            onAddTask(title, workType, duration);
+          // Just remove categorizing flag, keep default classification
+          tempTaskIds.forEach((tempId, index) => {
+            onAddTask(taskTitles[index], 'light', 30, false, tempId);
           });
         } else {
           const { classifications } = data;
-          // Add each classified task
-          taskTitles.forEach((title, index) => {
+          // Update each task with AI classification
+          tempTaskIds.forEach((tempId, index) => {
             const classification = classifications[index];
-            onAddTask(title, classification.workType, classification.duration);
-            
-            // Show classification result
-            toast({
-              title: "Task categorized",
-              description: `"${title}" → ${classification.taskType} (${classification.workType} work, ${classification.duration} min)`,
-              duration: 2000
-            });
+            onAddTask(
+              taskTitles[index], 
+              classification.workType, 
+              classification.duration, 
+              false, 
+              tempId,
+              classification.taskType
+            );
           });
         }
         
-        setTaskTitle('');
       } catch (error) {
         console.error('Error adding tasks:', error);
         toast({
@@ -65,7 +128,6 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
           description: "Failed to add tasks. Please try again.",
           variant: "destructive"
         });
-      } finally {
         setIsProcessing(false);
       }
     }

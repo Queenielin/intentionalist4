@@ -13,6 +13,8 @@ export interface Task {
   createdAt: Date;
   groupId?: string; // ID of the group this task belongs to
   isGrouped?: boolean; // Whether this task is part of a group
+  isCategorizing?: boolean; // Whether this task is being categorized by AI
+  taskType?: string; // AI-classified subcategory
 }
 
 export interface TaskGroup {

@@ -14,22 +14,55 @@ const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const { toast } = useToast();
 
-  const handleAddTask = (title: string, workType: WorkType, duration: 15 | 30 | 60, scheduledDay: 'today' | 'tomorrow' = 'today') => {
+  const handleAddTask = (
+    title: string, 
+    workType: WorkType, 
+    duration: 15 | 30 | 60, 
+    isCategorizing: boolean = false, 
+    tempId?: string,
+    taskType?: string,
+    scheduledDay: 'today' | 'tomorrow' = 'today'
+  ) => {
+    const taskId = tempId || crypto.randomUUID();
+    
+    // If tempId exists, update existing task
+    if (tempId) {
+      setTasks(prev => prev.map(task => 
+        task.id === tempId 
+          ? { ...task, workType, duration, isCategorizing, taskType }
+          : task
+      ));
+      
+      if (!isCategorizing) {
+        toast({
+          title: "Task updated!",
+          description: `Categorized as ${workType} work (${duration} min)`,
+        });
+      }
+      return;
+    }
+
+    // Create new task
     const newTask: Task = {
-      id: crypto.randomUUID(),
+      id: taskId,
       title,
       workType,
       duration,
       completed: false,
       scheduledDay,
       createdAt: new Date(),
+      isCategorizing,
+      taskType,
     };
 
     setTasks(prev => [...prev, newTask]);
-    toast({
-      title: "Task added!",
-      description: `Categorized as ${workType} work (${duration} min)`,
-    });
+    
+    if (!isCategorizing) {
+      toast({
+        title: "Task added!",
+        description: `Categorized as ${workType} work (${duration} min)`,
+      });
+    }
   };
 
   const handleDuplicateTask = (task: Task) => {
@@ -127,7 +160,9 @@ const Index = () => {
               onDeleteTask={handleDeleteTask}
               onDuplicateTask={handleDuplicateTask}
               onCompleteTask={handleCompleteTask}
-              onAddTask={handleAddTask}
+              onAddTask={(title, workType, duration, scheduledDay) => 
+                handleAddTask(title, workType, duration, false, undefined, undefined, scheduledDay)
+              }
             />
 
             {/* Tomorrow's simple column */}
