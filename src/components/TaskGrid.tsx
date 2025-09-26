@@ -79,16 +79,7 @@ export default function TaskGrid({
     return cellTasks.reduce((sum, task) => sum + (task.duration / 60), 0);
   };
 
-  if (dayTasks.length === 0) {
-    return (
-      <Card className="p-8 text-center bg-muted/30 border-dashed border-2">
-        <p className="text-muted-foreground text-lg">No tasks for {day}</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Add your first task above to get started with energy-optimized planning
-        </p>
-      </Card>
-    );
-  }
+  // Always show the grid, even if empty
 
   return (
     <div className="space-y-6">
