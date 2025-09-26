@@ -79,25 +79,26 @@ serve(async (req) => {
 
 // Extracted classification logic
 async function classifyTasks(tasks: string[], apiKey: string) {
-  const prompt = `You are an advanced task classifier. Return JSON array with objects containing:
-- workType: one of ["deep","light","admin"] 
-- duration: one of [15,30,60]
-- taskType: specific subcategory from the list below
-- groupingKey: category:subcategory format
+  const prompt = `You are an advanced task classifier. Directly categorize each task into ONE of these 8 categories and assign a smart duration:
 
-DEEP WORK SUBCATEGORIES:
-- "Analytical × Strategic" (Business strategy, analysis, financial modeling, decision frameworks, problem-solving)
-- "Creative × Generative" (Writing, design, coding, music, content creation, creative production)
-- "Learning × Absorptive" (Reading, studying, synthesizing knowledge, data exploration, research)
-- "Constructive × Building" (Product design, system architecture, prototyping, solution mapping, building)
+CATEGORIES (choose exactly one):
+1. "Analytical × Strategic" - Business strategy, analysis, financial modeling, decision frameworks, problem-solving
+2. "Creative × Generative" - Writing, design, coding, music, content creation, creative production  
+3. "Learning × Absorptive" - Reading, studying, synthesizing knowledge, data exploration, research
+4. "Constructive × Building" - Product design, system architecture, prototyping, solution mapping, building
+5. "Social & Relational" - Emails, chat replies, communication, networking, relationship building
+6. "Critical & Structuring" - Review, feedback, organizing, planning, coordination, follow-ups
+7. "Clerical & Admin Routines" - Documentation, data entry, form filling, timesheets, routine operations
+8. "Logistics & Maintenance" - Scheduling, calendar management, file organization, tool maintenance
 
-LIGHT WORK SUBCATEGORIES:
-- "Social & Relational" (Emails, chat replies, communication, networking, relationship building)
-- "Critical & Structuring" (Review, feedback, organizing, planning, coordination, follow-ups)
+DURATION GUIDELINES:
+- 15 minutes: Quick replies, simple admin tasks, brief reviews
+- 30 minutes: Standard tasks, most communication, planning sessions
+- 60 minutes: Deep work, complex analysis, significant creation/building
 
-ADMIN SUBCATEGORIES:
-- "Clerical & Admin Routines" (Documentation, data entry, form filling, timesheets, routine operations)
-- "Logistics & Maintenance" (Scheduling, calendar management, file organization, tool maintenance)
+Return JSON array with objects containing:
+- taskType: exact category name from the 8 options above
+- duration: one of [15,30,60] based on task complexity
 
 Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
 
@@ -126,25 +127,32 @@ Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
     }));
   }
 
-  // Validate classifications and normalize field names
-  const validWorkTypes = ['deep', 'light', 'admin'];
+  // Map the 8 categories to workType and validate
   const validDurations = [15, 30, 60];
   
-  const validSubcategories = [
-    'Analytical × Strategic', 'Creative × Generative', 'Learning × Absorptive', 'Constructive × Building',
-    'Social & Relational', 'Critical & Structuring',
-    'Clerical & Admin Routines', 'Logistics & Maintenance'
-  ];
+  const categoryToWorkType = {
+    'Analytical × Strategic': 'deep',
+    'Creative × Generative': 'deep', 
+    'Learning × Absorptive': 'deep',
+    'Constructive × Building': 'deep',
+    'Social & Relational': 'light',
+    'Critical & Structuring': 'light',
+    'Clerical & Admin Routines': 'admin',
+    'Logistics & Maintenance': 'admin'
+  };
+  
+  const validCategories = Object.keys(categoryToWorkType);
   
   return classifications.map((c: any) => {
-    const workType = validWorkTypes.includes(c.workType) ? c.workType : 'light';
-    const taskType = validSubcategories.includes(c.taskType) ? c.taskType : 'Social & Relational';
+    const taskType = validCategories.includes(c.taskType) ? c.taskType : 'Social & Relational';
+    const workType = categoryToWorkType[taskType as keyof typeof categoryToWorkType];
+    const duration = validDurations.includes(c.duration) ? c.duration : 30;
     
-    console.log(`Task classification: workType=${workType}, taskType=${taskType}`);
+    console.log(`Task classification: taskType=${taskType}, workType=${workType}, duration=${duration}`);
     
     return {
       workType,
-      duration: validDurations.includes(c.duration) ? c.duration : 30,
+      duration,
       taskType,
       groupingKey: `${workType}:${taskType}`
     };
