@@ -26,22 +26,68 @@ serve(async (req) => {
     }
 
     // Create prompt for batch processing
-    const prompt = `You are a classifier for a task manager. Given task titles, return a JSON array with objects containing:
+    const prompt = `You are an advanced task classifier for a productivity system. Given task titles, return a JSON array with objects containing:
 - workType: one of ["deep","light","admin"] (lowercase only)
 - duration: one of [15,30,60] (minutes, integer)
-- taskType: one of ["Email","Comms","Calls","Meetings","Planning","Writing","Reading","Research","Coding","Design","Documentation","Applications","Finance","Travel","Reviews","Chores","Learning","Other"]
-- groupingKey: short label used to group similar tasks (e.g., "Email:Support", "Comms:LinkedIn", "Applications:Kaplan")
+- taskType: specific subcategory based on cognitive type required
+- groupingKey: short label used to group similar tasks (e.g., "Email:Support", "Strategy:ProductRoadmap")
 
-Rules:
-1) Never output "General". If nothing fits, use "Other" with a sensible groupingKey.
-2) workType:
-   - admin → logistics/coordination/comms/scheduling/forms/payments/travel.
-   - deep → creation/analysis/learning/coding/writing/design/research/strategy.
-   - light → quick chores/small edits/short replies/reviews/labeling/filing.
-3) Duration heuristics (round to nearest of 15/30/60):
-   - 15 → ultra-quick replies, single confirmation/lookup, tiny edits, a single rating or review.
-   - 30 → small batches (3–6 emails/chats), simple bookings/forms, short reviews, brief planning.
-   - 60 → drafting/learning/research sessions, non-trivial coding/design, longer applications/prep.
+WORK TYPE DEFINITIONS:
+
+🔵 DEEP WORK | Focused × High-Value × Cognitively Demanding
+Work requiring full concentration, no distractions, producing high-value output through problem-solving, creativity, or analysis.
+Subcategories (taskType options):
+- "Strategy" → Business strategy, analysis, financial modeling, decision frameworks
+- "Creative" → Writing, design, coding, music, content creation  
+- "Research" → Reading, studying, synthesizing knowledge, data exploration
+- "Building" → Product design, system architecture, prototyping, solution mapping
+
+🟢 LIGHT WORK | Execution × Low-Depth × Medium Value
+Work requiring some focus but not deep concentration; routine tasks applying existing knowledge.
+Subcategories (taskType options):
+- "Communication" → Emails, chat replies, drafting short updates, responding to inquiries
+- "Review" → Reviewing documents, slide decks, pull requests, proofreading
+- "Organizing" → Updating task boards, making short plans, simple scheduling
+- "Coordination" → Follow-ups, aligning with colleagues, preparing reminders
+
+🟡 ADMIN WORK | Maintenance × Low Cognitive Demand × Organizational  
+Necessary support tasks that keep systems running but don't produce high-value creative output.
+Subcategories (taskType options):
+- "Documentation" → Logging notes, updating CRM, form filling, timesheets
+- "Scheduling" → Booking/rescheduling meetings, time-blocking
+- "FileManagement" → Uploading files, renaming, organizing folders, backups
+- "Operations" → Expense reports, invoice processing, compliance checklists
+
+DURATION ASSIGNMENT RULES:
+
+⚡ 15-MINUTE TASKS | Quick × Low Complexity × High Context-Switch Tolerance
+Small, atomic tasks completed in one go with little prep:
+- Replying to 3-5 emails
+- Quick calendar reschedule  
+- Sending reminder/follow-up message
+- Reviewing short document for typos
+- Simple data entry
+
+⏳ 30-MINUTE TASKS | Medium Depth × Moderate Focus × Self-Contained
+Work requiring moderate focus, finished in one sitting:
+- Drafting LinkedIn post or short update
+- Creating 2-3 presentation slides
+- Reviewing and commenting on short proposal
+- Testing software feature
+- Writing meeting notes summary
+
+🎯 60-MINUTE TASKS | Deep × High Focus × Complex Output
+Sustained deep focus producing tangible output:
+- Writing 2-3 page report section
+- Coding feature or debugging workflow
+- Designing product flow
+- Research and synthesis
+- Strategy presentation prep
+
+SPECIAL RULES:
+1) If task appears to need >1 hour, still assign 60 minutes but add "Block 1" to groupingKey
+2) Never use "General" - always pick specific subcategory
+3) For batch tasks (multiple emails, etc.), estimate total time and categorize accordingly
 
 Return only a JSON array with one object per task, in the same order. No explanations.
 
@@ -118,9 +164,14 @@ ${tasks.map((task: string, index: number) => `${index + 1}. ${task}`).join('\n')
       const validWorkTypes = ['deep', 'light', 'admin'];
       const validDurations = [15, 30, 60];
       const validTaskTypes = [
-        'Email', 'Comms', 'Calls', 'Meetings', 'Planning', 'Writing', 'Reading',
-        'Research', 'Coding', 'Design', 'Documentation', 'Applications', 'Finance',
-        'Travel', 'Reviews', 'Chores', 'Learning', 'Other'
+        // Deep Work subcategories
+        'Strategy', 'Creative', 'Research', 'Building',
+        // Light Work subcategories  
+        'Communication', 'Review', 'Organizing', 'Coordination',
+        // Admin Work subcategories
+        'Documentation', 'Scheduling', 'FileManagement', 'Operations',
+        // Legacy fallback
+        'Other'
       ];
 
       return {
