@@ -86,22 +86,18 @@ async function classifyTasks(tasks: string[], apiKey: string) {
 - groupingKey: category:subcategory format
 
 DEEP WORK SUBCATEGORIES:
-- "Strategy & Problem-Solving" (Business strategy, analysis, financial modeling, decision frameworks)
-- "Creative Production" (Writing, design, coding, music, content creation)
-- "Research & Learning" (Reading, studying, synthesizing knowledge, data exploration)
-- "Building & Designing" (Product design, system architecture, prototyping, solution mapping)
+- "Analytical × Strategic" (Business strategy, analysis, financial modeling, decision frameworks, problem-solving)
+- "Creative × Generative" (Writing, design, coding, music, content creation, creative production)
+- "Learning × Absorptive" (Reading, studying, synthesizing knowledge, data exploration, research)
+- "Constructive × Building" (Product design, system architecture, prototyping, solution mapping, building)
 
 LIGHT WORK SUBCATEGORIES:
-- "Communication" (Emails, chat replies, drafting short updates, responding to inquiries)
-- "Review & Feedback" (Reviewing documents, slide decks, pull requests, proofreading)
-- "Organizing & Planning" (Updating task boards, making short plans, simple scheduling)
-- "Follow-Ups & Coordination" (Chasing deliverables, aligning with colleagues, preparing reminders)
+- "Social & Relational" (Emails, chat replies, communication, networking, relationship building)
+- "Critical & Structuring" (Review, feedback, organizing, planning, coordination, follow-ups)
 
 ADMIN SUBCATEGORIES:
-- "Documentation & Data Entry" (Logging notes, updating CRM, form filling, timesheets)
-- "Scheduling & Calendar" (Booking/rescheduling meetings, time-blocking)
-- "File & Tool Maintenance" (Uploading files, renaming, organizing folders, backups)
-- "Routine Operations" (Expense reports, invoice processing, compliance checklists)
+- "Clerical & Admin Routines" (Documentation, data entry, form filling, timesheets, routine operations)
+- "Logistics & Maintenance" (Scheduling, calendar management, file organization, tool maintenance)
 
 Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
 
