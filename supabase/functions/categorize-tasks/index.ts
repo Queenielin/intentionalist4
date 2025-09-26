@@ -22,13 +22,12 @@ serve(async (req) => {
 
     console.log('Processing tasks for categorization:', tasks);
 
-    // Categorize each task using Gemini API
-    const categorizedTasks = [];
+    // Create batch prompt for all tasks
+    const taskTitles = tasks.map((task: any) => `"${task.title}"`).join('\n');
     
-    for (const task of tasks) {
-      const prompt = `You are a classifier for a task manager. Given a single task title or short description, return a JSON object with:
+    const batchPrompt = `You are a classifier for a task manager. Given a single task title or short description, return a JSON object with:
 - workType: one of ["deep","light","admin"] (lowercase only)
-- duration: one of [30,60,90] (minutes, integer)
+- duration: one of [15,30,60] (minutes, integer)
 - taskType: one of [
   "Email","Comms","Calls","Meetings","Planning","Writing","Reading",
   "Research","Coding","Design","Documentation","Applications","Finance",
@@ -42,10 +41,10 @@ Rules:
    - admin → logistics/coordination/comms/scheduling/forms/payments/travel.
    - deep → creation/analysis/learning/coding/writing/design/research/strategy.
    - light → quick chores/small edits/short replies/reviews/labeling/filing.
-3) Duration heuristics (round to nearest of 30/60/90):
-   - 30 → quick replies, 1–5 emails/chats, small edits, single booking.
-   - 60 → write/draft/learn/research session, non-trivial bug, moderate prep.
-   - 90 → "make/build/refactor module/MVP", long deck/essay/application, unknown scope with creation.
+3) Duration heuristics (round to nearest of 15/30/60):
+   - 15 → ultra-quick replies (1–2 messages), single confirmation/lookup, tiny edits, a single rating or review.
+   - 30 → small batches (3–6 emails/chats), simple bookings/forms, short reviews, brief planning.
+   - 60 → drafting/learning/research sessions, non-trivial coding/design, longer applications/prep.
 4) Keyword nudges (not exclusive):
    - admin: reply, email, message, WhatsApp, LinkedIn, call, schedule, book, arrange, confirm, invoice, expense, receipt, submit, form, register, apply, visa, Airbnb, travel.
    - deep: draft, write, analyze, journal, research, study, learn, read chapter, design, architecture, refactor, implement, prototype, build, strategy.
@@ -55,7 +54,7 @@ Rules:
 FORMAT
 {
   "workType": "deep|light|admin",
-  "duration": 30|60|90,
+  "duration": 15|30|60,
   "taskType": "OneOfTheList",
   "groupingKey": "ShortGroupingLabel"
 }
@@ -66,109 +65,177 @@ Input: "Reply to 5 customer support emails"
 Output: {"workType":"admin","duration":30,"taskType":"Email","groupingKey":"Email:Support"}
 
 Input: "Prepare slides for Monday's strategy meeting"
-Output: {"workType":"deep","duration":90,"taskType":"Design","groupingKey":"Design:Strategy Deck"}
+Output: {"workType":"deep","duration":60,"taskType":"Design","groupingKey":"Design:Strategy Deck"}
 
 Input: "Schedule 1:1 with team members"
 Output: {"workType":"admin","duration":30,"taskType":"Meetings","groupingKey":"Meetings:1:1 Scheduling"}
 
 Input: "Refactor the authentication module"
-Output: {"workType":"deep","duration":90,"taskType":"Coding","groupingKey":"Coding:Auth Refactor"}
+Output: {"workType":"deep","duration":60,"taskType":"Coding","groupingKey":"Coding:Auth Refactor"}
 
 Input: "Organize expense receipts and submit reimbursement form"
-Output: {"workType":"admin","duration":60,"taskType":"Finance","groupingKey":"Finance:Expenses"}
+Output: {"workType":"admin","duration":30,"taskType":"Finance","groupingKey":"Finance:Expenses"}
 
 Input: "Fix typo on landing page"
-Output: {"workType":"light","duration":30,"taskType":"Design","groupingKey":"Design:Landing Page Edit"}
+Output: {"workType":"light","duration":15,"taskType":"Design","groupingKey":"Design:Landing Page Edit"}
 
 Input: "Draft 500-word blog post on feature X"
 Output: {"workType":"deep","duration":60,"taskType":"Writing","groupingKey":"Writing:Feature X Blog"}
 
-Now classify this task:
-"${task.title}"`;
+-- YOUR TASKS (examples) --
 
-      try {
-        console.log('Calling Gemini API for task:', task.title);
-        
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 200,
-            }
-          }),
-        });
+Input: "1 journal & analysis"
+Output: {"workType":"deep","duration":60,"taskType":"Planning","groupingKey":"Planning:Journaling"}
 
-        if (!response.ok) {
-          throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-        }
+Input: "Reply to LinkedIn"
+Output: {"workType":"admin","duration":15,"taskType":"Comms","groupingKey":"Comms:LinkedIn"}
 
-        const data = await response.json();
-        console.log('Gemini response for task:', task.title, JSON.stringify(data, null, 2));
+Input: "Study adhd class - adhd content of the day"
+Output: {"workType":"deep","duration":60,"taskType":"Learning","groupingKey":"Learning:ADHD Course"}
 
-        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-          const responseText = data.candidates[0].content.parts[0].text.trim();
-          console.log('Raw Gemini response text:', responseText);
-          
-          // Clean the response text and extract JSON
-          let cleanedText = responseText;
-          
-          // Remove markdown code blocks if present
-          cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
-          
-          // Find JSON object
-          const jsonMatch = cleanedText.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/);
-          
-          if (jsonMatch) {
-            const classification = JSON.parse(jsonMatch[0]);
-            console.log('Parsed classification:', classification);
-            
-            // Map Gemini response to our format
-            let workType: 'deep' | 'light' | 'admin' = 'light';
-            if (classification.work_depth === 'Deep Work') workType = 'deep';
-            else if (classification.work_depth === 'Admin Work') workType = 'admin';
-            else if (classification.work_depth === 'Light Work') workType = 'light';
-            
-            let duration: 15 | 30 | 60 = 30;
-            const timeEstimate = parseInt(classification.time_estimate);
-            if (timeEstimate === 30) duration = 30;
-            else if (timeEstimate === 60) duration = 60;
-            else if (timeEstimate === 90) duration = 60; // Cap at 60
+Input: "reply to Specialsterm AU"
+Output: {"workType":"admin","duration":15,"taskType":"Email","groupingKey":"Email:Specialsterm AU"}
 
-            categorizedTasks.push({
-              ...task,
-              id: task.id || `task-${Date.now()}-${Math.random()}`,
-              workType,
-              duration,
-              taskType: classification.task_type || 'General'
-            });
-            
-            console.log('Successfully categorized task:', task.title, 'as', workType, duration, classification.task_type);
-          } else {
-            throw new Error(`No valid JSON found in Gemini response: ${responseText}`);
+Input: "reply to bali Airbnb"
+Output: {"workType":"admin","duration":15,"taskType":"Travel","groupingKey":"Travel:Airbnb Bali"}
+
+Input: "write google review"
+Output: {"workType":"light","duration":15,"taskType":"Reviews","groupingKey":"Reviews:Google"}
+
+Input: "reply to TW emails"
+Output: {"workType":"admin","duration":30,"taskType":"Email","groupingKey":"Email:TW"}
+
+Input: "reply to Julie"
+Output: {"workType":"admin","duration":15,"taskType":"Comms","groupingKey":"Comms:Julie"}
+
+Input: "coding"
+Output: {"workType":"deep","duration":60,"taskType":"Coding","groupingKey":"Coding:General"}
+
+Input: "Apply for netherlands program"
+Output: {"workType":"admin","duration":60,"taskType":"Applications","groupingKey":"Applications:Netherlands Program"}
+
+Input: "Make an mvp"
+Output: {"workType":"deep","duration":60,"taskType":"Coding","groupingKey":"Coding:MVP Prototype"}
+
+Input: "Read innovation book"
+Output: {"workType":"deep","duration":60,"taskType":"Reading","groupingKey":"Reading:Innovation Book"}
+
+Input: "Write goal of mvp"
+Output: {"workType":"deep","duration":30,"taskType":"Planning","groupingKey":"Planning:MVP Goals"}
+
+Input: "Reply to whtsapp + apollonia"
+Output: {"workType":"admin","duration":15,"taskType":"Comms","groupingKey":"Comms:WhatsApp Apollonia"}
+
+Input: "Kaplan scholarship write!"
+Output: {"workType":"deep","duration":60,"taskType":"Writing","groupingKey":"Applications:Kaplan Essay"}
+
+Now classify these tasks. Return a JSON array where each element corresponds to the task at the same index:
+
+${taskTitles}
+
+Return format: [{"workType":"...","duration":...,"taskType":"...","groupingKey":"..."},...]`;
+
+    const categorizedTasks: any[] = [];
+
+    try {
+      console.log('Calling Gemini API for batch classification');
+      
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: batchPrompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1000,
           }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Gemini batch response:', JSON.stringify(data, null, 2));
+
+      if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+        const responseText = data.candidates[0].content.parts[0].text.trim();
+        console.log('Raw Gemini batch response text:', responseText);
+        
+        // Clean the response text and extract JSON array
+        let cleanedText = responseText;
+        
+        // Remove markdown code blocks if present
+        cleanedText = cleanedText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        
+        // Find JSON array
+        const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
+        
+        if (jsonMatch) {
+          const classifications = JSON.parse(jsonMatch[0]);
+          console.log('Parsed classifications:', classifications);
+          
+          // Map each classification to a task
+          tasks.forEach((task: any, index: number) => {
+            const classification = classifications[index];
+            
+            if (classification) {
+              // Use the correct field names from the new schema
+              const workType = classification.workType || 'light';
+              const duration = classification.duration || 30;
+              const taskType = classification.taskType || 'Other';
+              const groupingKey = classification.groupingKey || `${taskType}:General`;
+
+              categorizedTasks.push({
+                ...task,
+                id: task.id || `task-${Date.now()}-${Math.random()}-${index}`,
+                workType,
+                duration,
+                taskType,
+                groupingKey
+              });
+              
+              console.log('Successfully categorized task:', task.title, 'as', workType, duration, taskType, groupingKey);
+            } else {
+              // Fallback for missing classification
+              categorizedTasks.push({
+                ...task,
+                id: task.id || `task-${Date.now()}-${Math.random()}-${index}`,
+                workType: 'light',
+                duration: 30,
+                taskType: 'Other',
+                groupingKey: 'Other:General'
+              });
+              console.log('Used fallback for task:', task.title);
+            }
+          });
         } else {
-          throw new Error(`Invalid Gemini API response structure: ${JSON.stringify(data)}`);
+          throw new Error(`No valid JSON array found in Gemini response: ${responseText}`);
         }
-      } catch (error) {
-        console.error('Error processing task with Gemini:', task.title, error);
-        // Fallback to original task properties
+      } else {
+        throw new Error(`Invalid Gemini API response structure: ${JSON.stringify(data)}`);
+      }
+    } catch (error) {
+      console.error('Error in batch processing with Gemini:', error);
+      
+      // Fallback: create tasks with default values
+      tasks.forEach((task: any, index: number) => {
         categorizedTasks.push({
           ...task,
-          id: task.id || `task-${Date.now()}-${Math.random()}`,
-          workType: task.workType || 'light',
-          duration: task.duration || 30,
-          taskType: 'General'
+          id: task.id || `task-${Date.now()}-${Math.random()}-${index}`,
+          workType: 'light',
+          duration: 30,
+          taskType: 'Other',
+          groupingKey: 'Other:General'
         });
-      }
+      });
     }
 
     // Group similar tasks
