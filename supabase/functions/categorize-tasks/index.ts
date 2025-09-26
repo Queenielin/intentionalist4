@@ -79,26 +79,54 @@ serve(async (req) => {
 
 // Extracted classification logic
 async function classifyTasks(tasks: string[], apiKey: string) {
-  const prompt = `You are an advanced task classifier. Directly categorize each task into ONE of these 8 categories and assign a smart duration:
+  const prompt = `You are an advanced task classifier using cognitive science principles. Classify each task into ONE of these 8 categories:
 
-CATEGORIES (choose exactly one):
-1. "Analytical × Strategic" - Business strategy, analysis, financial modeling, decision frameworks, problem-solving
-2. "Creative × Generative" - Writing, design, coding, music, content creation, creative production  
-3. "Learning × Absorptive" - Reading, studying, synthesizing knowledge, data exploration, research
-4. "Constructive × Building" - Product design, system architecture, prototyping, solution mapping, building
-5. "Social & Relational" - Emails, chat replies, communication, networking, relationship building
-6. "Critical & Structuring" - Review, feedback, organizing, planning, coordination, follow-ups
-7. "Clerical & Admin Routines" - Documentation, data entry, form filling, timesheets, routine operations
-8. "Logistics & Maintenance" - Scheduling, calendar management, file organization, tool maintenance
+🧠 DEEP WORK (High cognitive load, sustained focus):
+
+1. "Analytical × Strategic" - Logic-heavy, structured reasoning, big-picture trade-offs
+   • Business strategy, financial modeling, decision frameworks, problem-solving, analysis
+   • Examples: strategic planning, market analysis, business cases, complex decisions
+
+2. "Creative × Generative" - Divergent, imaginative, associative synthesis  
+   • Writing, design, coding, music, content creation, brainstorming, ideation
+   • Examples: writing articles, creative design, programming, composing, innovation
+
+3. "Learning × Absorptive" - Taking in and encoding new material, schema-building
+   • Reading, studying, research, knowledge synthesis, data exploration
+   • Examples: studying courses, reading books, research, learning new skills
+
+4. "Constructive × Building" - Hands-on creation, chaining micro-decisions into artifacts
+   • Product design, system architecture, prototyping, building, implementation
+   • Examples: building products, coding implementations, creating prototypes
+
+🔄 LIGHT WORK (Medium focus, execution/processing):
+
+5. "Social & Relational" - Communication and coordination using social cognition
+   • Emails, chat replies, networking, follow-ups, coordination, relationship building
+   • Examples: replying to emails, Slack messages, networking, team coordination
+
+6. "Critical & Structuring" - Detail-oriented review and organization
+   • Review, feedback, organizing, planning, proofreading, quality checks
+   • Examples: reviewing documents, giving feedback, organizing tasks, planning
+
+🟡 ADMIN WORK (Low focus, maintenance/logistics):
+
+7. "Clerical & Admin Routines" - Repetitive procedures and compliance
+   • Documentation, data entry, form filling, routine operations, logging
+   • Examples: expense reports, data entry, form completion, compliance tasks
+
+8. "Logistics & Maintenance" - Scheduling and organizational maintenance
+   • Calendar management, file organization, booking, tool maintenance, backups
+   • Examples: scheduling meetings, organizing files, calendar management
 
 DURATION GUIDELINES:
-- 15 minutes: Quick replies, simple admin tasks, brief reviews
-- 30 minutes: Standard tasks, most communication, planning sessions
-- 60 minutes: Deep work, complex analysis, significant creation/building
+- 15 minutes: Quick replies, simple admin, brief reviews, short coordination
+- 30 minutes: Standard communication, planning sessions, moderate analysis
+- 60 minutes: Deep analytical work, complex creation, intensive learning, building
 
 Return JSON array with objects containing:
 - taskType: exact category name from the 8 options above
-- duration: one of [15,30,60] based on task complexity
+- duration: one of [15,30,60] based on cognitive complexity and typical time needed
 
 Tasks: ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}`;
 
