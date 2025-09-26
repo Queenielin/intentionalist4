@@ -32,20 +32,6 @@ const Index = () => {
     });
   };
 
-  const handleAddMultipleTasks = (newTasks: Array<{title: string; workType: WorkType; duration: 15 | 30 | 60}>) => {
-    const tasksToAdd = newTasks.map(task => ({
-      id: crypto.randomUUID(),
-      title: task.title,
-      workType: task.workType,
-      duration: task.duration,
-      completed: false,
-      scheduledDay: 'today' as const,
-      createdAt: new Date(),
-    }));
-
-    setTasks(prev => [...prev, ...tasksToAdd]);
-  };
-
   const handleDuplicateTask = (task: Task) => {
     const duplicatedTask: Task = {
       ...task,
@@ -110,7 +96,7 @@ const Index = () => {
 
         {/* Task Input */}
         <div className="mb-8">
-          <TaskInput onAddTask={handleAddTask} onAddMultipleTasks={handleAddMultipleTasks} />
+          <TaskInput onAddTask={handleAddTask} />
         </div>
 
         {/* Main Content Tabs */}
