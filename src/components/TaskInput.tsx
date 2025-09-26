@@ -15,7 +15,8 @@ interface TaskInputProps {
 export default function TaskInput({ onAddTask, onAddMultipleTasks }: TaskInputProps) {
   const [taskTitle, setTaskTitle] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [pendingTasks, setPendingTasks] = useState<Array<{title: string; workType: 'deep' | 'light' | 'admin'; duration: 15 | 30 | 60}>>([]);
+  const [pendingTasks, setPendingTasks] = useState<Array<{title: string}>>([]);
+  const [originalTasks, setOriginalTasks] = useState<Array<{title: string; workType: 'deep' | 'light' | 'admin'; duration: 15 | 30 | 60}>>([]);
   const { toast } = useToast();
 
   const handleAddTask = () => {
@@ -23,8 +24,10 @@ export default function TaskInput({ onAddTask, onAddMultipleTasks }: TaskInputPr
       const tasks = parseTaskInput(taskTitle);
       
       if (tasks.length > 1 && onAddMultipleTasks) {
-        // Show confirmation for multiple tasks
-        setPendingTasks(tasks);
+        // Store both versions: titles for AI and full tasks for fallback
+        const taskTitles = tasks.map(task => ({ title: task.title }));
+        setPendingTasks(taskTitles);
+        setOriginalTasks(tasks);
         toast({
           title: "Multiple tasks detected",
           description: `Found ${tasks.length} tasks. Would you like to use AI grouping?`,
@@ -63,6 +66,7 @@ export default function TaskInput({ onAddTask, onAddMultipleTasks }: TaskInputPr
       }
       
       setPendingTasks([]);
+      setOriginalTasks([]);
       setTaskTitle('');
     } catch (error) {
       console.error('Error categorizing tasks:', error);
@@ -72,11 +76,12 @@ export default function TaskInput({ onAddTask, onAddMultipleTasks }: TaskInputPr
         variant: "destructive",
       });
       
-      // Fallback to normal addition
-      pendingTasks.forEach(({ title, workType, duration }) => {
+      // Fallback to normal addition using original parsed tasks
+      originalTasks.forEach(({ title, workType, duration }) => {
         onAddTask(title, workType, duration);
       });
       setPendingTasks([]);
+      setOriginalTasks([]);
       setTaskTitle('');
     } finally {
       setIsProcessing(false);
@@ -84,10 +89,11 @@ export default function TaskInput({ onAddTask, onAddMultipleTasks }: TaskInputPr
   };
 
   const handleSkipGrouping = () => {
-    pendingTasks.forEach(({ title, workType, duration }) => {
+    originalTasks.forEach(({ title, workType, duration }) => {
       onAddTask(title, workType, duration);
     });
     setPendingTasks([]);
+    setOriginalTasks([]);
     setTaskTitle('');
   };
 
