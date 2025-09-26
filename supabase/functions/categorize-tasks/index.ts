@@ -26,17 +26,65 @@ serve(async (req) => {
     const categorizedTasks = [];
     
     for (const task of tasks) {
-      const prompt = `You are an assistant for a task manager app. Given a user's task description, classify it into:
+      const prompt = `You are a classifier for a task manager. Given a single task title or short description, return a JSON object with:
+- workType: one of ["deep","light","admin"] (lowercase only)
+- duration: one of [30,60,90] (minutes, integer)
+- taskType: one of [
+  "Email","Comms","Calls","Meetings","Planning","Writing","Reading",
+  "Research","Coding","Design","Documentation","Applications","Finance",
+  "Travel","Reviews","Chores","Learning","Other"
+]
+- groupingKey: short label used to group similar tasks (e.g., "Email:Support", "Comms:LinkedIn", "Applications:Kaplan")
 
-Work Depth → Deep Work / Light Work / Admin Work
+Rules:
+1) Never output "General". If nothing fits, use "Other" with a sensible groupingKey.
+2) Depth:
+   - admin → logistics/coordination/comms/scheduling/forms/payments/travel.
+   - deep → creation/analysis/learning/coding/writing/design/research/strategy.
+   - light → quick chores/small edits/short replies/reviews/labeling/filing.
+3) Duration heuristics (round to nearest of 30/60/90):
+   - 30 → quick replies, 1–5 emails/chats, small edits, single booking.
+   - 60 → write/draft/learn/research session, non-trivial bug, moderate prep.
+   - 90 → "make/build/refactor module/MVP", long deck/essay/application, unknown scope with creation.
+4) Keyword nudges (not exclusive):
+   - admin: reply, email, message, WhatsApp, LinkedIn, call, schedule, book, arrange, confirm, invoice, expense, receipt, submit, form, register, apply, visa, Airbnb, travel.
+   - deep: draft, write, analyze, journal, research, study, learn, read chapter, design, architecture, refactor, implement, prototype, build, strategy.
+   - light: quick, review (short), tidy, rename, format, minor fix, rate, label.
+5) Output JSON only. No explanations. Use integers for duration.
 
-Time Estimate → 30 / 60 / 90 (minutes, rounded to nearest block)
+FORMAT
+{
+  "workType": "deep|light|admin",
+  "duration": 30|60|90,
+  "taskType": "OneOfTheList",
+  "groupingKey": "ShortGroupingLabel"
+}
 
-Task Type → A high-level category label so similar tasks can be grouped. (Examples: Writing, Research, Coding, Email, Meetings, Planning, Design, Review, Documentation, Learning, Chores)
+FEW-SHOT EXAMPLES
 
-Always return JSON only. Do not include any explanation or markdown formatting.
+Input: "Reply to 5 customer support emails"
+Output: {"workType":"admin","duration":30,"taskType":"Email","groupingKey":"Email:Support"}
 
-Task: "${task.title}"`;
+Input: "Prepare slides for Monday's strategy meeting"
+Output: {"workType":"deep","duration":90,"taskType":"Design","groupingKey":"Design:Strategy Deck"}
+
+Input: "Schedule 1:1 with team members"
+Output: {"workType":"admin","duration":30,"taskType":"Meetings","groupingKey":"Meetings:1:1 Scheduling"}
+
+Input: "Refactor the authentication module"
+Output: {"workType":"deep","duration":90,"taskType":"Coding","groupingKey":"Coding:Auth Refactor"}
+
+Input: "Organize expense receipts and submit reimbursement form"
+Output: {"workType":"admin","duration":60,"taskType":"Finance","groupingKey":"Finance:Expenses"}
+
+Input: "Fix typo on landing page"
+Output: {"workType":"light","duration":30,"taskType":"Design","groupingKey":"Design:Landing Page Edit"}
+
+Input: "Draft 500-word blog post on feature X"
+Output: {"workType":"deep","duration":60,"taskType":"Writing","groupingKey":"Writing:Feature X Blog"}
+
+Now classify this task:
+"${task.title}"`;
 
       try {
         console.log('Calling Gemini API for task:', task.title);
