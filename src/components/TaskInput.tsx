@@ -103,7 +103,7 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
           console.error('Error categorizing tasks:', error);
           // Just remove categorizing flag, keep default classification
           tempTaskIds.forEach((tempId, index) => {
-            onAddTask(taskTitles[index], 'light', 30, false, tempId);
+            onAddTask(taskTitles[index], 'light', 30, false, tempId, 'Social & Relational');
           });
         } else {
           const { classifications } = data;
