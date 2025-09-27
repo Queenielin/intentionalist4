@@ -188,7 +188,7 @@ ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
 
   // Gemini REST call (v1beta)
   const resp = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-8b:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
     {
       method: "POST",
       headers: {
