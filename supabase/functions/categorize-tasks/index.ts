@@ -84,8 +84,7 @@ Deno.serve(async (req: Request) => {
         },
       });
     }
-  }
-  
+
     // --- NON-STREAMING ---
     const classifications = await classifyTasks(tasks, GEMINI_API_KEY);
     return new Response(JSON.stringify({ classifications }), {
@@ -203,9 +202,7 @@ ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
           max_output_tokens: 512,
           response_mime_type: "application/json",
           response_schema: {
-          }
-        }
-          type: "array",
+            type: "array",
             items: {
               type: "object",
               properties: {
@@ -214,7 +211,6 @@ ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
                 duration: { type: "number", enum: [15, 30, 60] },
               },
               required: ["title", "category", "duration"],
-              additionalProperties: false,
             },
           },
         },
