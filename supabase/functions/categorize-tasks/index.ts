@@ -128,17 +128,16 @@ function extractTimeHint(raw: string): { title: string; durationHint: 15|30|60|n
 // Extracted classification logic
 async function classifyTasks(tasks: string[], apiKey: string) {
   
-  // Preprocess titles: strip time hints into durationHint, keep clean titles for the prompt
-const pre = tasks.map(extractTimeHint);
-const cleaned = tasks.map(t => extractTimeHint(t).title);
-
-const hintDurations = pre.map(p => p.durationHint);
-
-  
   const validCategories = [
     "Analytical × Strategic","Creative × Generative","Learning × Absorptive","Constructive × Building",
     "Social & Relational","Critical & Structuring","Clerical & Admin Routines","Logistics & Maintenance"
   ];
+
+  // Preprocess: remove time hints from titles (but remember their value)
+const pre = tasks.map(extractTimeHint);
+const cleaned = pre.map(p => p.title);
+const hintDurations = pre.map(p => p.durationHint);
+
 
   // --- Prompt (final) ---
   const prompt = `You are an advanced task classifier using cognitive science principles.  
