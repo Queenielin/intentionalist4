@@ -130,7 +130,8 @@ async function classifyTasks(tasks: string[], apiKey: string) {
   
   // Preprocess titles: strip time hints into durationHint, keep clean titles for the prompt
 const pre = tasks.map(extractTimeHint);
-const cleaned = pre.map(p => p.title);
+const cleaned = tasks.map(t => extractTimeHint(t).title);
+
 const hintDurations = pre.map(p => p.durationHint);
 
   
@@ -171,6 +172,8 @@ Tasks:
 ${cleaned.map((task, i) => `${i + 1}. ${task}`).join('\n')}
 
 `;
+
+
 
   // --- Call Gemini with JSON mode + schema ---
   const resp = await fetch(
