@@ -198,22 +198,33 @@ ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.1,
-          max_output_tokens: 512,
-          response_mime_type: "application/json",
-          response_schema: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                title: { type: "string" },
-                category: { type: "string", enum: [...validCategories] },
-                duration: { type: "number", enum: [15, 30, 60] },
-              },
-              required: ["title", "category", "duration"],
-            },
-          },
-        },
+  temperature: 0.1,
+  max_output_tokens: 512,
+  response_mime_type: "application/json",
+  response_schema: {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        title:    { type: "string" },
+        category: { type: "string", enum: [
+          "Analytical × Strategic",
+          "Creative × Generative",
+          "Learning × Absorptive",
+          "Constructive × Building",
+          "Social & Relational",
+          "Critical & Structuring",
+          "Clerical & Admin Routines",
+          "Logistics & Maintenance"
+        ]},
+        // ✅ enum values as STRINGS
+        duration: { type: "string", enum: ["15","30","60"] }
+      },
+      required: ["title","category","duration"]
+    }
+  }
+}
+
       }),
     },
   );
@@ -281,13 +292,15 @@ if (/(reply|email|inbox|schedule|invite|remind|reschedul|expense|invoice|form|re
         ? (modelItem.category as (typeof validCategories)[number])
         : ("Social & Relational" as const);
 
-    const modelDur =
-      typeof modelItem.duration === "number" && validDur.has(modelItem.duration as 15 | 30 | 60)
-        ? (modelItem.duration as 15 | 30 | 60)
-        : null;
+   const toBlock = (v: unknown): 15|30|60|null => {
+  const n = Number(v);
+  return n === 15 || n === 30 || n === 60 ? (n as 15|30|60) : null;
+};
 
-    const duration = (modelDur ?? durationHint ?? guessDuration(title)) as 15 | 30 | 60;
+const modelDur = toBlock(modelItem.duration);
+const duration = (modelDur ?? durationHint ?? guessDuration(title)) as 15|30|60;
 
+    
     console.log(`Task classified: "${title}" => category=${category}, duration=${duration}`);
     return { title, category, duration };
   });
