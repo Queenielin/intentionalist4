@@ -92,8 +92,48 @@ if (stream && tasks.length > 1) {
   }
 });
 
+// Extract a time hint from a raw task (15|30|60) and return a cleaned title without the time tokens.
+// Keeps counts like "10 emails" intact; only removes time words like "15m", "30 min", "1h", etc.
+function extractTimeHint(raw: string): { title: string; durationHint: 15|30|60|null } {
+  const original = String(raw);
+  let duration: 15|30|60 | null = null;
+
+  const lower = original.toLowerCase();
+
+  // Decide duration from hint (cap at 60 for a single block)
+  if (/\b(15m|15 min(?:ute)?s?|quarter[- ]?hour|quick)\b/i.test(lower)) {
+    duration = 15;
+  } else if (/\b(30m|30 min(?:ute)?s?|half[- ]?hour)\b/i.test(lower)) {
+    duration = 30;
+  } else if (/\b(60m|1h|1 hour|full[- ]?hour)\b/i.test(lower)) {
+    duration = 60;
+  } else if (/\b(90m|1\.5h|1\.5 hours)\b/i.test(lower)) {
+    duration = 60; // clamp to one block
+  } else if (/\b(2h|2 hours|120m)\b/i.test(lower)) {
+    duration = 60; // clamp to one block
+  }
+
+  // Remove ONLY time tokens; keep counts like "10 emails"
+  let cleaned = original
+    .replace(/\b(15m|15\s*min(?:ute)?s?|30m|30\s*min(?:ute)?s?|60m|1h|1\s*hour|2h|2\s*hours|90m|120m|half[- ]?hour|quarter[- ]?hour|full[- ]?hour|quick)\b/ig, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) cleaned = original.trim();
+
+  return { title: cleaned, durationHint: duration };
+}
+
+
 // Extracted classification logic
 async function classifyTasks(tasks: string[], apiKey: string) {
+  
+  // Preprocess titles: strip time hints into durationHint, keep clean titles for the prompt
+const pre = tasks.map(extractTimeHint);
+const cleaned = pre.map(p => p.title);
+const hintDurations = pre.map(p => p.durationHint);
+
+  
   const validCategories = [
     "Analytical × Strategic","Creative × Generative","Learning × Absorptive","Constructive × Building",
     "Social & Relational","Critical & Structuring","Clerical & Admin Routines","Logistics & Maintenance"
@@ -128,7 +168,8 @@ OUTPUT FORMAT:
 [{ "title": "<cleaned task text>", "category": "<one of 8>", "duration": 15|30|60 }]
 
 Tasks:
-${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}
+${cleaned.map((task, i) => `${i + 1}. ${task}`).join('\n')}
+
 `;
 
   // --- Call Gemini with JSON mode + schema ---
@@ -164,6 +205,20 @@ ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}
     }
   );
 
+// --- Handle non-200 from Gemini early ---
+if (!resp.ok) {
+  const errBody = await resp.text().catch(() => '');
+  console.error('Gemini HTTP error:', resp.status, errBody);
+  // Graceful fallback so your API still returns something usable
+  return tasks.map(t => ({
+    title: t,
+    category: "Social & Relational",
+    duration: 30
+  }));
+}
+
+
+  
   // --- Parse robustly (json mode or plain text) ---
   const data = await resp.json();
   const part = data?.candidates?.[0]?.content?.parts?.[0];
@@ -189,13 +244,23 @@ ${tasks.map((task, i) => `${i + 1}. ${task}`).join('\n')}
     return 30;
   };
 
-  // --- Normalize & return final shape ---
-  return tasks.map((originalTitle, i) => {
-    const m = arr[i] || {};
-    const title    = (m?.title && String(m.title).trim()) || originalTitle;
-    const category = validCategories.includes(m?.category) ? m.category : "Social & Relational";
-    const duration = validDur.has(m?.duration) ? m.duration : guessDuration(title);
-    console.log(`Task classified: "${title}" => category=${category}, duration=${duration}`);
-    return { title, category, duration };
-  });
+// --- Normalize & return final shape ---
+return tasks.map((originalTitle, i) => {
+  const m = arr[i] || {};
+
+  // Use the preprocessed title + durationHint
+  const { title: cleanedTitle, durationHint } = extractTimeHint(originalTitle);
+
+  const title    = (m?.title && String(m.title).trim()) || cleanedTitle;
+  const category = validCategories.includes(m?.category) ? m.category : "Social & Relational";
+  
+  // Duration priority: model → hint → heuristic
+  const duration = validDur.has(m?.duration)
+    ? m.duration
+    : (durationHint ?? guessDuration(title));
+
+  console.log(`Task classified: "${title}" => category=${category}, duration=${duration}`);
+  return { title, category, duration };
+});
+
 }
