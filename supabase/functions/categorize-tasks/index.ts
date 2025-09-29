@@ -186,46 +186,23 @@ Tasks:
 ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
 `;
 
-  // Gemini REST call (v1beta)
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",     method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-  temperature: 0.1,
-  max_output_tokens: 512,
-  response_mime_type: "application/json",
-  response_schema: {
-    type: "array",
-    items: {
-      type: "object",
-      properties: {
-        title:    { type: "string" },
-        category: { type: "string", enum: [
-          "Analytical × Strategic",
-          "Creative × Generative",
-          "Learning × Absorptive",
-          "Constructive × Building",
-          "Social & Relational",
-          "Critical & Structuring",
-          "Clerical & Admin Routines",
-          "Logistics & Maintenance"
-        ]},
-        // ✅ enum values as STRINGS
-        duration: { type: "string", enum: ["15","30","60"] }
-      },
-      required: ["title","category","duration"]
-    }
-  }
-}
-
-      }),
+const resp = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
-
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 512,
+      }
+    }),
+  }
+);
+ 
   // Handle non-200 early
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => "");
