@@ -1,13 +1,10 @@
-import { Task, Slot, Category8, CATEGORIES_8 } from '@/types/task';
-import SlotCard from '@/components/SlotCard'; // new name (renamed from TaskGroupCard)
-import { getCategoryColor } from '@/utils/taskAI'; // replacement for color
-
+import { Task, WorkType } from '@/types/task';
 import TaskCard from './TaskCard';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-
+import { getWorkTypeColor } from '@/utils/taskAI';
 
 interface TaskGridProps {
   tasks: Task[];
