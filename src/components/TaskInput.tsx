@@ -1,8 +1,7 @@
 // src/components/TaskInput.tsx
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea'; // ⬅️ make sure this path matches your Textarea file
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 interface TaskInputProps {
   onAddTask: (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
@@ -10,14 +9,13 @@ interface TaskInputProps {
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [value, setValue] = useState('');
-  const [duration, setDuration] = useState<15 | 30 | 60>(30);
-  const [scheduledDay, setScheduledDay] = useState<'today' | 'tomorrow'>('today');
 
   const addOne = useCallback((title: string) => {
     const t = title.trim();
     if (!t) return;
-    onAddTask(t, duration, scheduledDay);
-  }, [onAddTask, duration, scheduledDay]);
+    // Default to 30 minutes and today
+    onAddTask(t, 30, 'today');
+  }, [onAddTask]);
 
   const handleSubmit = useCallback(() => {
     // split by newlines; keep each line as its own task
@@ -28,68 +26,37 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
   }, [value, addOne]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // ONLY submit on ⌘/Ctrl+Enter
+    // Submit on ⌘/Ctrl+Enter
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
       return;
     }
-    // Plain Enter should make a newline — do NOT preventDefault here.
   };
 
   return (
-    // ⬅️ if this ever lives inside a <form>, prevent auto submit:
-    // <form onSubmit={(e) => e.preventDefault()}>
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-      <div className="flex-1 space-y-1">
+    <div className="flex gap-4 items-start">
+      <div className="flex-1">
         <Textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
           rows={6}
-          className="resize-y"
-          placeholder={`One task per line, e.g.:
-1 journal & analysis
-Reply to LinkedIn
-Study adhd class - adhd content of the day
-reply to Specialsterm AU
-reply to bali Airbnb
-write google review
-...`}
+          className="resize-none border-2 border-primary/30 focus:border-primary text-base"
+          placeholder="Add your tasks here..."
         />
-        <div className="text-xs text-muted-foreground">
-          Press <kbd className="px-1">⌘/Ctrl</kbd>+<kbd className="px-1">Enter</kbd> to add all lines. Enter adds a new line.
+        <div className="text-sm text-muted-foreground mt-2">
+          ⌘ Press Ctrl+Enter to add • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
         </div>
       </div>
 
-      <div className="flex gap-2 sm:flex-col sm:w-[260px]">
-        <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v) as 15 | 30 | 60)}>
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="Duration" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="15">15 min</SelectItem>
-            <SelectItem value="30">30 min</SelectItem>
-            <SelectItem value="60">60 min</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={scheduledDay} onValueChange={(v: 'today' | 'tomorrow') => setScheduledDay(v)}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Day" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="today">Today</SelectItem>
-            <SelectItem value="tomorrow">Tomorrow</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* ⬅️ important: button should NOT be type="submit" */}
-        <Button type="button" onClick={handleSubmit} className="whitespace-nowrap">
-          Add Tasks
-        </Button>
-      </div>
+      <Button 
+        onClick={handleSubmit} 
+        className="px-6 py-3 h-auto text-base font-medium"
+        size="lg"
+      >
+        + Add Task
+      </Button>
     </div>
-    // </form>
   );
 }

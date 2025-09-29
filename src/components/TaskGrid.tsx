@@ -61,22 +61,7 @@ export default function TaskGrid({
   const completed = dayTasks.filter((t) => t.completed).length;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold capitalize">{day}'s Tasks</h2>
-        <div className="flex gap-2">
-          <Badge variant="outline" className="text-xs">
-            {remaining} remaining
-          </Badge>
-          <Badge variant="outline" className="text-xs">
-            {completed} completed
-          </Badge>
-        </div>
-      </div>
-
-      {/* 8 category boxes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {CATEGORIES_8.map((category) => {
           const bucket = CATEGORY_TO_BUCKET[category];
           const colorClass = getBucketColorClass(bucket);
@@ -87,30 +72,25 @@ export default function TaskGrid({
             <Card
               key={category}
               className={cn(
-                'min-h-[200px] p-4 transition-all duration-200 border border-muted-foreground/20 hover:border-muted-foreground/40',
+                'min-h-[300px] p-6 transition-all duration-200 border-0 shadow-lg',
                 colorClass
               )}
             >
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {/* Category header */}
                 <div className="text-center">
-                  <h4 className="text-sm font-semibold text-white/90 mb-1">
+                  <h4 className="text-lg font-bold text-white mb-2">
                     {category}
                   </h4>
-                  <div className="flex items-center justify-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
+                  <div className="flex items-center justify-center">
+                    <Badge variant="secondary" className="text-sm bg-white/20 text-white border-white/30">
                       {catTasks.length} tasks
                     </Badge>
-                    {hours > 0 && (
-                      <span className="text-xs text-white/80">
-                        {hours.toFixed(1)}h total
-                      </span>
-                    )}
                   </div>
                 </div>
 
                 {/* Tasks */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {catTasks.map((task) => (
                     <TaskCard
                       key={task.id}
@@ -123,8 +103,8 @@ export default function TaskGrid({
 
                   {/* Add task input for this category */}
                   <Input
-                    placeholder={`Add ${category.toLowerCase()} task...`}
-                    className="text-xs bg-white/20 border-white/30 text-white placeholder:text-white/60"
+                    placeholder={`Add ${category.toLowerCase().split(' ')[0]} task...`}
+                    className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/60 h-10"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         const title = (e.target as HTMLInputElement).value.trim();
@@ -140,7 +120,6 @@ export default function TaskGrid({
             </Card>
           );
         })}
-      </div>
     </div>
   );
 }

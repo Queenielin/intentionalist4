@@ -72,25 +72,25 @@ export default function TaskCard({ task, onUpdate, onDelete, onComplete, isDragg
   return (
     <Card
       className={cn(
-        'p-4 transition-all duration-300 cursor-move group hover:scale-102 border-0',
+        'p-3 transition-all duration-300 cursor-move group hover:scale-102 border-0',
         colorClass,
         task.completed && 'task-completed',
         isDragging && 'task-dragging'
       )}
     >
-      <div className="flex items-center gap-3">
-        <Grip className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" />
+      <div className="flex items-center gap-2">
+        <Grip className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
 
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onComplete(task.id)}
           className={cn(
-            'p-1 h-8 w-8 transition-all duration-300',
+            'p-1 h-6 w-6 transition-all duration-300',
             task.completed ? 'text-current' : 'text-white/70 hover:text-white'
           )}
         >
-          <CheckCircle2 className={cn('w-5 h-5', task.completed && 'fill-current')} />
+          <CheckCircle2 className={cn('w-4 h-4', task.completed && 'fill-current')} />
         </Button>
 
         <div className="flex-1 min-w-0">
@@ -100,77 +100,52 @@ export default function TaskCard({ task, onUpdate, onDelete, onComplete, isDragg
               onChange={(e) => setEditTitle(e.target.value)}
               onKeyDown={handleKeyPress}
               onBlur={handleSaveEdit}
-              className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/70"
+              className="text-xs bg-white/20 border-white/30 text-white placeholder:text-white/70 h-6"
               autoFocus
             />
           ) : (
             <div>
-              <p className={cn('font-medium text-sm', task.completed && 'line-through opacity-70')}>
+              <p className={cn('font-medium text-xs', task.completed && 'line-through opacity-70')}>
                 {task.title}
                 {task.isCategorizing && (
-                  <span className="ml-2 text-xs opacity-75 animate-pulse">Categorizing...</span>
+                  <span className="ml-1 text-xs opacity-75 animate-pulse">...</span>
                 )}
               </p>
-              {task.taskType && !task.isCategorizing && (
-                <p className="text-xs opacity-75 mt-1">{task.taskType}</p>
-              )}
             </div>
           )}
         </div>
 
         {/* Duration */}
-        <div className="flex items-center gap-2 text-xs opacity-90">
-          <Clock className="w-4 h-4" />
+        <div className="flex items-center gap-1 text-xs opacity-90">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onUpdate(task.id, { duration: cycleDuration(task.duration) })}
-            className="h-6 px-2 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors"
+            className="h-5 px-1.5 text-xs bg-white/20 border border-white/30 text-white hover:bg-white/30 transition-colors"
           >
             {task.duration}m
           </Button>
         </div>
 
-        {/* Category selector (8 categories) */}
-        <Select
-          value={task.category}
-          onValueChange={(value) => onUpdate(task.id, { category: value as Category8 })}
-        >
-          <SelectTrigger className="w-56 h-6 text-xs bg-white/20 border-white/30 text-white">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CATEGORY_OPTIONS.map((cat) => (
-              <SelectItem key={cat} value={cat}>
-                {cat}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         {/* Edit/Delete controls */}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsEditing(true)}
-            className="p-1 h-6 w-6 text-white/70 hover:text-white"
+            className="p-1 h-5 w-5 text-white/70 hover:text-white"
           >
-            <Edit3 className="w-3 h-3" />
+            <Edit3 className="w-2.5 h-2.5" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onDelete(task.id)}
-            className="p-1 h-6 w-6 text-white/70 hover:text-white"
+            className="p-1 h-5 w-5 text-white/70 hover:text-white"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-2.5 h-2.5" />
           </Button>
         </div>
-      </div>
-
-      <div className="mt-2 text-xs opacity-75">
-        {task.category} • {bucket.toUpperCase()} • {task.duration} minutes
       </div>
     </Card>
   );
