@@ -197,7 +197,7 @@ async function classifyTasks(tasks: string[], apiKey: string) {
   const cleaned = pre.map((p) => p.title);
 
 
-const prompt = `You are an advanced task classifier using cognitive science principles.
+  const prompt = `You are an advanced task classifier using cognitive science principles.
 Classify each task into ONE of these 8 categories, then assign a duration (15, 30, 60).
 
 CRITICAL: Your response must be ONLY valid JSON - no explanations, no markdown, no code fences.
@@ -209,9 +209,19 @@ CATEGORIES (cognitive definitions):
 3. "Learning × Absorptive" = reading/studying/encoding new material (input-heavy, not output).
 4. "Constructive × Building" = hands-on implementation/prototyping, chaining micro-decisions into a build.
 5. "Social & Relational" = communication & coordination: replies, follow-ups, team alignment, messaging.
-6. "Critical & Structuring" = review/organization: proofreading, feedback, task board updates, short plans.
+6. "Critical & Structuring" = review/organization/editing: proofreading, feedback, editing, task board updates, short plans, quality control.
 7. "Clerical & Admin Routines" = routine logging/compliance: expenses, invoices, forms, data entry.
 8. "Logistics & Maintenance" = scheduling, calendar, file/folder/backup/tool hygiene.
+
+EXAMPLES:
+- "Proofreading a document" → "Critical & Structuring" (60min)
+- "Reply to emails" → "Social & Relational" (15min)
+- "Write a blog post" → "Creative × Generative" (60min)
+- "Research market trends" → "Learning × Absorptive" (60min)
+- "Debug code issue" → "Analytical × Strategic" (30min)
+- "Build new feature" → "Constructive × Building" (60min)
+- "File expenses" → "Clerical & Admin Routines" (15min)
+- "Schedule meetings" → "Logistics & Maintenance" (15min)
 
 DURATION GUIDELINES:
 - 15 → quick replies, simple admin, brief reviews, short coordination
@@ -221,7 +231,7 @@ DURATION GUIDELINES:
 Tie-break rules:
 - If multiple actions: choose the DOMINANT one (latest verb or biggest effort).
 - If ambiguous: pick the category needing MORE focus (bias upward).
-- Duration can be shortened if the task clearly signals small scale (e.g. "1 email" = 15, "20 emails" = 60).
+- Duration: "proofreading" is typically 60min for focus, "quick review" is 15min.
 
 OUTPUT FORMAT:
 [{ "title": "<cleaned task text>", "category": "<one of 8>", "duration": 15|30|60 }]
@@ -230,38 +240,40 @@ Tasks:
 ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
 `;
 
-const model = await resolveGeminiModel(apiKey);
+  const model = await resolveGeminiModel(apiKey);
 
-const callGen = async (modelName: string) => {
-  return fetch(
- `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 512,
+  const callGen = async (modelName: string) => {
+    return fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 1024,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+  };
+
+  let resp = await callGen(model);
+
+  // If model went missing or doesn't support method, refresh and retry once
+  if (!resp.ok && resp.status === 404) {
+    console.error("Gemini 404 for model:", model, "— refreshing model catalog and retrying once");
+    CACHED_GEMINI_MODEL = null;
+    const fallbackModel = await resolveGeminiModel(apiKey);
+    if (fallbackModel !== model) {
+      resp = await callGen(fallbackModel);
     }
-  );
-};
-
-let resp = await callGen(model);
-
-// If model went missing or doesn't support method, refresh and retry once
-if (!resp.ok && resp.status === 404) {
-  console.error("Gemini 404 for model:", model, "— refreshing model catalog and retrying once");
-  CACHED_GEMINI_MODEL = null;
-  const fallbackModel = await resolveGeminiModel(apiKey);
-  if (fallbackModel !== model) {
-    resp = await callGen(fallbackModel);
   }
-}
- 
+
   // Handle non-200 early
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => "");
@@ -285,12 +297,14 @@ if (!resp.ok && resp.status === 404) {
     } else {
       const text = (part?.text ?? "").trim().replace(/```json|```/g, "");
       
-      // Add this line to extract JSON from surrounding text:
-const jsonMatch = text.match(/\[[\s\S]*\]/);
+      // Extract JSON from surrounding text:
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const jsonText = jsonMatch ? jsonMatch[0] : text;
      
-      arr = text ? JSON.parse(text) : [];
+      arr = jsonText ? JSON.parse(jsonText) : [];
     }
   } catch {
+    console.error("Failed to parse JSON response:", part?.text);
     arr = [];
   }
 
