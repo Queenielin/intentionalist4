@@ -137,6 +137,48 @@ function extractTimeHint(raw: string): { title: string; durationHint: 15 | 30 | 
   return { title: cleaned, durationHint: duration };
 }
 
+// Model resolution helpers (pick a supported model dynamically and cache it)
+let CACHED_GEMINI_MODEL: string | null = null;
+
+async function pickGeminiModel(apiKey: string): Promise<string> {
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) throw new Error(`ListModels HTTP ${res.status}`);
+    const data = await res.json();
+    const models: Array<{ name?: string; supportedGenerationMethods?: string[] }> = data?.models ?? [];
+    const withGen = models
+      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+      .map((m) => (m.name ?? "").replace(/^models\//, ""))
+      .filter(Boolean);
+
+    // Prefer newest flash variants, then pro
+    const preferOrder = [
+      (n: string) => /2\.0/.test(n) && /flash/.test(n),
+      (n: string) => /1\.5/.test(n) && /flash/.test(n),
+      (n: string) => /flash/.test(n),
+      (n: string) => /1\.5/.test(n) && /pro/.test(n),
+      (n: string) => /pro/.test(n),
+      (_: string) => true,
+    ];
+
+    for (const test of preferOrder) {
+      const found = withGen.find((n) => test(n));
+      if (found) return found;
+    }
+  } catch (e) {
+    console.error("Failed to list Gemini models:", e);
+  }
+  // Safe fallbacks used historically
+  return "gemini-1.5-flash-latest";
+}
+
+async function resolveGeminiModel(apiKey: string): Promise<string> {
+  if (CACHED_GEMINI_MODEL) return CACHED_GEMINI_MODEL;
+  CACHED_GEMINI_MODEL = await pickGeminiModel(apiKey);
+  console.log("Using Gemini model:", CACHED_GEMINI_MODEL);
+  return CACHED_GEMINI_MODEL;
+}
+
 // Core classifier (Gemini JSON mode + schema)
 async function classifyTasks(tasks: string[], apiKey: string) {
   const validCategories = [
@@ -188,22 +230,38 @@ Tasks:
 ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
 `;
 
-const resp = await fetch(
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 512,
-      }
-    }),
+const model = await resolveGeminiModel(apiKey);
+
+const callGen = async (modelName: string) => {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 512,
+        },
+      }),
+    }
+  );
+};
+
+let resp = await callGen(model);
+
+// If model went missing or doesn't support method, refresh and retry once
+if (!resp.ok && resp.status === 404) {
+  console.error("Gemini 404 for model:", model, "— refreshing model catalog and retrying once");
+  CACHED_GEMINI_MODEL = null;
+  const fallbackModel = await resolveGeminiModel(apiKey);
+  if (fallbackModel !== model) {
+    resp = await callGen(fallbackModel);
   }
-);
+}
  
   // Handle non-200 early
   if (!resp.ok) {
