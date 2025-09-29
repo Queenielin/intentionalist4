@@ -1,197 +1,69 @@
-import { useState, KeyboardEvent } from 'react';
-import { Plus } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { breakDownTasks } from '@/utils/taskAI';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-
-// Map Gemini category to app WorkType
-const categoryToWorkType = (category: string): 'deep' | 'light' | 'admin' => {
-  switch (category) {
-    case 'Analytical × Strategic':
-    case 'Creative × Generative':
-    case 'Learning × Absorptive':
-    case 'Constructive × Building':
-      return 'deep';
-    case 'Social & Relational':
-    case 'Critical & Structuring':
-      return 'light';
-    case 'Clerical & Admin Routines':
-    case 'Logistics & Maintenance':
-      return 'admin';
-    default:
-      return 'light';
-  }
-};
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TaskInputProps {
-  onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60, isCategorizing?: boolean, tempId?: string, taskType?: string) => void;
+  // Parent will create the Task with category left undefined and isCategorizing=true if desired,
+  // then your backend will fill in {title, category, duration}.
+  onAddTask: (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
 }
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
-  const [taskTitle, setTaskTitle] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
+  const [value, setValue] = useState('');
+  const [duration, setDuration] = useState<15 | 30 | 60>(30);
+  const [scheduledDay, setScheduledDay] = useState<'today' | 'tomorrow'>('today');
 
-  const handleAddTask = async () => {
-    if (taskTitle.trim()) {
-      setIsProcessing(true);
-      try {
-        // Break down the input into individual task titles
-        const taskTitles = breakDownTasks(taskTitle);
-        
-        // Add tasks immediately with "categorizing" status
-        const tempTaskIds: string[] = [];
-        taskTitles.forEach((title) => {
-          const tempId = `temp-${Date.now()}-${Math.random()}`;
-          tempTaskIds.push(tempId);
-          onAddTask(title, 'light', 30, true, tempId); // Add with categorizing flag
-        });
-
-        // Show immediate feedback
-        toast({
-          title: "Tasks added",
-          description: `${taskTitles.length} task(s) added and categorizing...`,
-          duration: 2000
-        });
-
-        setTaskTitle('');
-        setIsProcessing(false);
-
-        // Try streaming first for multiple tasks
-        if (taskTitles.length > 1) {
-          try {
-            const response = await fetch(`https://kerstiyewadsqwkvrafq.supabase.co/functions/v1/categorize-tasks`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlcnN0aXlld2Fkc3F3a3ZyYWZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5MjgxNDksImV4cCI6MjA3MzUwNDE0OX0.A7r5gtYbJfRaAZlubv8ivUq1R2262PaRED9DnJVhgH8`,
-              },
-              body: JSON.stringify({ tasks: taskTitles, stream: true }),
-            });
-
-            if (response.body) {
-              const reader = response.body.getReader();
-              const decoder = new TextDecoder();
-
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
-                
-for (const rawLine of lines) {
-  const line = rawLine.trim();
-  if (line.startsWith('data:')) {
-    const payload = line.slice(5).trim(); // after 'data:'
-    if (payload === 'done') continue; // ignore end signal
-    if (!payload.startsWith('{')) continue; // skip non-JSON payloads
-    try {
-      const data = JSON.parse(payload);
-      const { index, classification } = data as any;
-      const taskType = (classification?.category ?? classification?.taskType) as string;
-      const workType = categoryToWorkType(taskType);
-
-      // Update the specific task with AI classification
-      onAddTask(
-        taskTitles[index],
-        workType,
-        classification.duration,
-        false, // Remove categorizing flag
-        tempTaskIds[index], // Use temp ID to update existing task
-        taskType
-      );
-
-      toast({
-        title: "Task updated",
-        description: `"${taskTitles[index]}" → ${taskType}`,
-        duration: 1500
-      });
-    } catch (_e) {
-      // Ignore malformed line (e.g., partial chunks)
-    }
-  }
-}
-              }
-              return;
-            }
-          } catch (streamError) {
-            console.log('Streaming failed, falling back to batch:', streamError);
-          }
-        }
-
-        // Fallback to batch processing
-        const { data, error } = await supabase.functions.invoke('categorize-tasks', {
-          body: { tasks: taskTitles }
-        });
-
-        if (error) {
-          console.error('Error categorizing tasks:', error);
-          // Just remove categorizing flag, keep default classification
-          tempTaskIds.forEach((tempId, index) => {
-            onAddTask(taskTitles[index], 'light', 30, false, tempId, 'Social & Relational');
-          });
-        } else {
-          const { classifications } = data;
-          // Update each task with AI classification
-          tempTaskIds.forEach((tempId, index) => {
-            const classification = classifications[index];
-onAddTask(
-  taskTitles[index], 
-  categoryToWorkType(classification.category), 
-  classification.duration, 
-  false, 
-  tempId,
-  classification.category
-);
-          });
-        }
-        
-      } catch (error) {
-        console.error('Error adding tasks:', error);
-        toast({
-          title: "Error",
-          description: "Failed to add tasks. Please try again.",
-          variant: "destructive"
-        });
-        setIsProcessing(false);
-      }
-    }
+  const addOne = (title: string) => {
+    const t = title.trim();
+    if (!t) return;
+    onAddTask(t, duration, scheduledDay);
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      handleAddTask();
-    }
+  const handleSubmit = () => {
+    // support multi-line paste: add each non-empty line as a task
+    const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    lines.forEach(addOne);
+    setValue('');
   };
 
   return (
-    <Card className="p-6 shadow-lg border-0 bg-gradient-to-r from-background to-muted/30">
-      <div className="flex gap-3">
-        <Textarea
-          value={taskTitle}
-          onChange={(e) => setTaskTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Add multiple tasks (try: '1. Code for 2hr 2. Email clients 3. Review proposal')"
-          className="flex-1 border-2 border-border/60 focus:border-primary transition-colors text-base min-h-[120px] focus-ring"
-          autoFocus
-        />
-        <Button 
-          onClick={handleAddTask}
-          disabled={!taskTitle.trim() || isProcessing}
-          className="h-12 px-6 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg hover:shadow-xl focus-ring"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {isProcessing ? 'Categorizing...' : 'Add Task'}
-        </Button>
-      </div>
-      <p className="text-sm text-muted-foreground mt-3 text-center">
-        ⌨️ Press Ctrl+Enter to add • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
-      </p>
-    </Card>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Input
+        placeholder="Add a task (press Enter). Paste multiple lines to add many."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
+      />
+
+      <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v) as 15 | 30 | 60)}>
+        <SelectTrigger className="w-[110px]">
+          <SelectValue placeholder="Duration" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="15">15 min</SelectItem>
+          <SelectItem value="30">30 min</SelectItem>
+          <SelectItem value="60">60 min</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select value={scheduledDay} onValueChange={(v: 'today' | 'tomorrow') => setScheduledDay(v)}>
+        <SelectTrigger className="w-[130px]">
+          <SelectValue placeholder="Day" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="today">Today</SelectItem>
+          <SelectItem value="tomorrow">Tomorrow</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Button onClick={handleSubmit}>Add</Button>
+    </div>
   );
 }
