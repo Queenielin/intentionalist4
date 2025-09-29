@@ -1,151 +1,99 @@
-import { Task } from '@/types/task';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Info } from 'lucide-react';
-
-
-import { summarizeByBucket, getWorkloadWarnings } from "@/utils/taskAI";
-
-const summary = summarizeByBucket(tasks);           // tasks: Task[]
-const warnings = getWorkloadWarnings(summary);
-
-// example reads
-summary.deep.totalHours;
-summary.light[30];               // number of 30-min light tasks
-summary.admin[15];
-summary.grandTotalHours;
-
-// render warnings
-warnings.map(w => w.message);
-
-
-import { cn } from '@/lib/utils';
+import { Task, CATEGORY_TO_BUCKET } from '@/types/task';
+import { AlertCircle, BarChart2 } from 'lucide-react';
 
 interface WorkloadSummaryProps {
   tasks: Task[];
-  day: 'today' | 'tomorrow';
 }
 
-export default function WorkloadSummary({ tasks, day }: WorkloadSummaryProps) {
-  const dayTasks = tasks.filter(task => 
-    day === 'today' ? !task.scheduledDay || task.scheduledDay === 'today' : task.scheduledDay === 'tomorrow'
-  );
-  
-  const summary = calculateWorkloadSummary(dayTasks);
-  const warnings = getWorkloadWarnings(summary);
+// Simple limits you described (hours)
+const PRODUCTIVITY_LIMITS = {
+  deep: { beginner: { min: 1, max: 2 }, trained: { min: 3, max: 4 }, ceiling: 5 },
+  light: { daily: { min: 4, max: 6 }, ceiling: 6 },
+  total: { daily: { min: 5, max: 7 }, ceiling: 7 },
+};
 
-  const getWorkTypeStatus = (workType: 'deep' | 'light', total: number) => {
-    if (workType === 'deep') {
-      if (total > PRODUCTIVITY_LIMITS.deep.ceiling) return 'error';
-      if (total > PRODUCTIVITY_LIMITS.deep.trained.max) return 'warning';
-      if (total >= PRODUCTIVITY_LIMITS.deep.trained.min) return 'good';
-      return 'low';
-    } else {
-      if (total > PRODUCTIVITY_LIMITS.light.ceiling) return 'error';
-      if (total >= PRODUCTIVITY_LIMITS.light.daily.min) return 'good';
-      return 'low';
-    }
+export default function WorkloadSummary({ tasks }: WorkloadSummaryProps) {
+  // Only count incomplete tasks
+  const open = tasks.filter(t => !t.completed && t.duration);
+
+  // accumulate minutes by bucket
+  const mins = { deep: 0, light: 0, admin: 0, total: 0 };
+  for (const t of open) {
+    // category may be temporarily undefined while AI runs; skip those until categorized
+    if (!t.category) continue;
+    const bucket = CATEGORY_TO_BUCKET[t.category];
+    mins[bucket] += t.duration;
+    mins.total += t.duration;
+  }
+
+  const hours = {
+    deep: +(mins.deep / 60).toFixed(1),
+    light: +(mins.light / 60).toFixed(1),
+    admin: +(mins.admin / 60).toFixed(1),
+    total: +(mins.total / 60).toFixed(1),
   };
 
-  const getTotalStatus = (total: number) => {
-    if (total > PRODUCTIVITY_LIMITS.total.ceiling) return 'error';
-    if (total >= PRODUCTIVITY_LIMITS.total.daily.min) return 'good';
-    return 'low';
-  };
+  const warnings: Array<{ type: 'deep' | 'light' | 'total'; message: string; severity: 'warning' | 'error' }> = [];
+
+  // Deep warnings
+  if (hours.deep > PRODUCTIVITY_LIMITS.deep.ceiling) {
+    warnings.push({ type: 'deep', message: `Deep: ${hours.deep}h exceeds ceiling (${PRODUCTIVITY_LIMITS.deep.ceiling}h)`, severity: 'error' });
+  } else if (hours.deep > PRODUCTIVITY_LIMITS.deep.trained.max) {
+    warnings.push({ type: 'deep', message: `Deep: ${hours.deep}h exceeds trained limit (${PRODUCTIVITY_LIMITS.deep.trained.max}h)`, severity: 'warning' });
+  }
+
+  // Light warnings
+  if (hours.light > PRODUCTIVITY_LIMITS.light.ceiling) {
+    warnings.push({ type: 'light', message: `Light: ${hours.light}h exceeds ceiling (${PRODUCTIVITY_LIMITS.light.ceiling}h)`, severity: 'error' });
+  }
+
+  // Total warnings
+  if (hours.total > PRODUCTIVITY_LIMITS.total.ceiling) {
+    warnings.push({ type: 'total', message: `Total: ${hours.total}h exceeds daily ceiling (${PRODUCTIVITY_LIMITS.total.ceiling}h)`, severity: 'error' });
+  }
 
   return (
-    <Card className="p-4 space-y-4">
-      <h4 className="font-semibold text-lg capitalize">{day} Summary</h4>
-      
-      {/* Work Type Summaries */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Deep Work</span>
-            <Badge 
-              variant={getWorkTypeStatus('deep', summary.deep.total) === 'error' ? 'destructive' : 
-                     getWorkTypeStatus('deep', summary.deep.total) === 'warning' ? 'secondary' : 'default'}
-              className={cn(
-                getWorkTypeStatus('deep', summary.deep.total) === 'good' && 'bg-green-100 text-green-800'
-              )}
-            >
-              {summary.deep.total.toFixed(1)}h
-            </Badge>
-          </div>
-          <div className="text-xs text-muted-foreground space-y-1">
-            {summary.deep[60] > 0 && <div>60min: {summary.deep[60]} tasks</div>}
-            {summary.deep[30] > 0 && <div>30min: {summary.deep[30]} tasks</div>}
-            {summary.deep[15] > 0 && <div>15min: {summary.deep[15]} tasks</div>}
-          </div>
-        </div>
+    <Card className="p-4 bg-muted/30 border-0 space-y-3">
+      <div className="flex items-center gap-2">
+        <BarChart2 className="w-4 h-4 text-primary" />
+        <h4 className="text-sm font-semibold">Workload Summary (open tasks)</h4>
+      </div>
 
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Light Work</span>
-            <Badge 
-              variant={getWorkTypeStatus('light', summary.light.total) === 'error' ? 'destructive' : 'default'}
-              className={cn(
-                getWorkTypeStatus('light', summary.light.total) === 'good' && 'bg-green-100 text-green-800'
-              )}
-            >
-              {summary.light.total.toFixed(1)}h
-            </Badge>
-          </div>
-          <div className="text-xs text-muted-foreground space-y-1">
-            {summary.light[60] > 0 && <div>60min: {summary.light[60]} tasks</div>}
-            {summary.light[30] > 0 && <div>30min: {summary.light[30]} tasks</div>}
-            {summary.light[15] > 0 && <div>15min: {summary.light[15]} tasks</div>}
-          </div>
+      <div className="grid grid-cols-4 gap-3 text-sm">
+        <div className="rounded-md p-3 bg-background/40">
+          <div className="text-xs text-muted-foreground">Deep</div>
+          <div className="text-lg font-semibold">{hours.deep}h</div>
         </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Admin Work</span>
-            <Badge variant="outline">
-              {summary.admin.total.toFixed(1)}h
-            </Badge>
-          </div>
-          <div className="text-xs text-muted-foreground space-y-1">
-            {summary.admin[60] > 0 && <div>60min: {summary.admin[60]} tasks</div>}
-            {summary.admin[30] > 0 && <div>30min: {summary.admin[30]} tasks</div>}
-            {summary.admin[15] > 0 && <div>15min: {summary.admin[15]} tasks</div>}
-          </div>
+        <div className="rounded-md p-3 bg-background/40">
+          <div className="text-xs text-muted-foreground">Light</div>
+          <div className="text-lg font-semibold">{hours.light}h</div>
+        </div>
+        <div className="rounded-md p-3 bg-background/40">
+          <div className="text-xs text-muted-foreground">Admin</div>
+          <div className="text-lg font-semibold">{hours.admin}h</div>
+        </div>
+        <div className="rounded-md p-3 bg-background/40">
+          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-lg font-semibold">{hours.total}h</div>
         </div>
       </div>
 
-      {/* Total Summary */}
-      <div className="pt-2 border-t">
-        <div className="flex items-center justify-between">
-          <span className="font-medium">Total Workload</span>
-          <Badge 
-            variant={getTotalStatus(summary.grandTotal) === 'error' ? 'destructive' : 'default'}
-            className={cn(
-              getTotalStatus(summary.grandTotal) === 'good' && 'bg-green-100 text-green-800'
-            )}
-          >
-            {summary.grandTotal.toFixed(1)}h / {PRODUCTIVITY_LIMITS.total.ceiling}h
-          </Badge>
+      {warnings.length > 0 && (
+        <div className="space-y-2">
+          {warnings.map((w, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-2 text-xs px-3 py-2 rounded-md ${
+                w.severity === 'error' ? 'bg-red-500/10 text-red-600' : 'bg-amber-500/10 text-amber-700'
+              }`}
+            >
+              <AlertCircle className="w-3 h-3" />
+              <span>{w.message}</span>
+            </div>
+          ))}
         </div>
-      </div>
-
-      {/* Research-based Guidelines */}
-      <Alert className="mt-4">
-        <Info className="h-4 w-4" />
-        <AlertDescription className="text-xs">
-          <strong>Research-based limits:</strong> Deep work 3-4h (max 5h), Light work 4-6h (max 6h), Total 5-7h (max 7h)
-        </AlertDescription>
-      </Alert>
-
-      {/* Warnings */}
-      {warnings.map((warning, index) => (
-        <Alert key={index} variant={warning.severity === 'error' ? 'destructive' : 'default'}>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            {warning.message}
-          </AlertDescription>
-        </Alert>
-      ))}
+      )}
     </Card>
   );
 }
