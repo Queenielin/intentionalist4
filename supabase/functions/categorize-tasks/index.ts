@@ -25,7 +25,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const GEMINI_API_KEY = "AIzaSyBspeSAHNujKWDfgjG5UcMZIbpPIvEdPfw";
     if (!GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not set" }), {
         status: 500,
