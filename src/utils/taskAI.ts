@@ -23,20 +23,29 @@ export type Task = {
   isCategorizing?: boolean;      // spinner while waiting for AI
 };
 
-// src/utils/taskAI.ts (or wherever this lives)
 
-// Parse multiple tasks from input — NO client-side categorization.
-export function parseTaskInput(
-  input: string
-): Array<{ title: string; duration: 15 | 30 | 60 }> {
+// src/utils/taskAI.ts
+
+// ✅ Split input into tasks + strip duration hints.
+// ❌ No more client-side heuristics, no WorkType, no 3-bucket logic.
+
+export type ParsedTaskInput = {
+  title: string;              // cleaned title after removing time tokens
+  duration: 15 | 30 | 60;     // provisional duration hint (AI can override)
+};
+
+// Public API: parse a blob of text into clean tasks with a duration hint.
+export function parseTaskInput(input: string): ParsedTaskInput[] {
   const tasks = breakDownTasks(input);
   return tasks.map((task) => {
     const { cleanTitle, duration } = extractTimeDuration(task);
-    return { title: cleanTitle, duration: duration ?? 30 }; // provisional 30 until AI returns
+    return { title: cleanTitle, duration: duration ?? 30 }; // default to 30 if no hint
   });
 }
 
-// Break down input into individual tasks (keep your current logic)
+// --- helpers ---
+
+// Break down input into individual tasks
 export function breakDownTasks(input: string): string[] {
   const trimmed = input.trim();
 
@@ -49,16 +58,12 @@ export function breakDownTasks(input: string): string[] {
   ];
 
   for (const pattern of listPatterns) {
-    const matches = trimmed.split(pattern).filter((item) => item.trim().length > 0);
-    if (matches.length > 1) {
-      return matches.map((task) => task.trim()).filter((task) => task.length > 3);
-    }
+    const parts = trimmed.split(pattern).map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 1) return parts.filter((t) => t.length > 3);
   }
 
   const lines = trimmed.split("\n").map((l) => l.trim()).filter((l) => l.length > 3);
-  if (lines.length > 1 && lines.every((l) => /\w/.test(l))) {
-    return lines;
-  }
+  if (lines.length > 1 && lines.every((l) => /\w/.test(l))) return lines;
 
   return [trimmed];
 }
@@ -92,11 +97,11 @@ export function extractTimeDuration(
   for (const { pattern } of taskDurationPatterns) {
     const match = title.match(pattern);
     if (match) {
-      const matchedText = match[0].toLowerCase();
+      const matched = match[0].toLowerCase();
       const isHours =
-        matchedText.includes("hour") ||
-        matchedText.includes("hr") ||
-        (matchedText.includes("h") && !matchedText.includes("m"));
+        matched.includes("hour") ||
+        matched.includes("hr") ||
+        (matched.includes("h") && !matched.includes("m"));
 
       const minutes = parseInt(match[1], 10) * (isHours ? 60 : 1);
       const cleanTitle = title.replace(match[0], "").replace(/\s+/g, " ").trim();
@@ -114,112 +119,113 @@ export function extractTimeDuration(
 }
 
 
+// src/utils/productivity.ts
+import { Task, CATEGORY_TO_BUCKET, WorkBucket } from "@/types/task";
 
-
-
-  
-  // Check for content duration first (these shouldn't be removed from title)
-  for (const { pattern } of contentDurationPatterns) {
-    if (pattern.test(title)) {
-      return { cleanTitle: title, isTaskDuration: false };
-    }
-  }
-  
-  // Check for task duration patterns
-  for (const { pattern, multiplier } of taskDurationPatterns) {
-    const match = title.match(pattern);
-    if (match) {
-      // Determine if it's hours or minutes based on the matched text
-      const matchedText = match[0].toLowerCase();
-      const isHours = matchedText.includes('hour') || matchedText.includes('hr') || (matchedText.includes('h') && !matchedText.includes('m'));
-      const duration = parseInt(match[1]) * (isHours ? 60 : 1);
-      const cleanTitle = title.replace(match[0], '').replace(/\s+/g, ' ').trim();
-      
-      // Round to nearest valid duration
-      let roundedDuration: 15 | 30 | 60;
-      if (duration <= 22) roundedDuration = 15;
-      else if (duration <= 45) roundedDuration = 30;
-      else roundedDuration = 60;
-      
-      return { cleanTitle, duration: roundedDuration, isTaskDuration: true };
-    }
-  }
-  
-  return { cleanTitle: title, isTaskDuration: false };
-}
-
-// Smart AI categorization with context-aware logic
-export function categorizeTask
-
-
-// Research-based productivity limits
 export const PRODUCTIVITY_LIMITS = {
   deep: {
-    beginner: { min: 1, max: 2 },
-    trained: { min: 3, max: 4 },
-    ceiling: 5
+    beginner: { min: 1, max: 2 },   // hours/day
+    trained:  { min: 3, max: 4 },
+    ceiling:  5,
   },
   light: {
-    daily: { min: 4, max: 6 },
-    ceiling: 6
+    daily:   { min: 4, max: 6 },
+    ceiling: 6,
   },
   total: {
-    daily: { min: 5, max: 7 },
-    ceiling: 7
-  }
+    daily:   { min: 5, max: 7 },
+    ceiling: 7,
+  },
+} as const;
+
+export type BucketSummary = {
+  15: number;
+  30: number;
+  60: number;
+  totalHours: number; // sum in hours
 };
 
-export function calculateWorkloadSummary(tasks: any[]) {
-  const summary = {
-    deep: { 15: 0, 30: 0, 60: 0, total: 0 },
-    light: { 15: 0, 30: 0, 60: 0, total: 0 },
-    admin: { 15: 0, 30: 0, 60: 0, total: 0 },
-    grandTotal: 0
+export type WorkloadSummary = Record<WorkBucket, BucketSummary> & {
+  grandTotalHours: number;
+};
+
+const emptyBucket = (): BucketSummary => ({ 15: 0, 30: 0, 60: 0, totalHours: 0 });
+
+/**
+ * Roll up tasks (by category) into 3 buckets for capacity math.
+ * Completed tasks are ignored.
+ */
+export function summarizeByBucket(tasks: Task[]): WorkloadSummary {
+  const summary: WorkloadSummary = {
+    deep:  emptyBucket(),
+    light: emptyBucket(),
+    admin: emptyBucket(),
+    grandTotalHours: 0,
   };
 
-  tasks.forEach(task => {
-    if (!task.completed) {
-      summary[task.workType][task.duration]++;
-      summary[task.workType].total += task.duration / 60;
-      summary.grandTotal += task.duration / 60;
+  for (const t of tasks) {
+    if (t.completed) continue;
+    // If category missing (still categorizing), skip it from capacity
+    if (!t.category) continue;
+
+    const bucket = CATEGORY_TO_BUCKET[t.category];
+    const b = summary[bucket];
+
+    if (t.duration === 15 || t.duration === 30 || t.duration === 60) {
+      b[t.duration] += 1;
+      b.totalHours += t.duration / 60;
+      summary.grandTotalHours += t.duration / 60;
     }
-  });
+  }
 
   return summary;
 }
 
-export function getWorkloadWarnings(summary: ReturnType<typeof calculateWorkloadSummary>) {
-  const warnings = [];
-  
-  if (summary.deep.total > PRODUCTIVITY_LIMITS.deep.ceiling) {
+export type WorkloadWarning = {
+  type: "deep" | "light" | "total";
+  message: string;
+  severity: "warning" | "error";
+};
+
+/**
+ * Convert a summary into user-facing warnings against your limits.
+ */
+export function getWorkloadWarnings(summary: WorkloadSummary): WorkloadWarning[] {
+  const warnings: WorkloadWarning[] = [];
+
+  // Deep
+  if (summary.deep.totalHours > PRODUCTIVITY_LIMITS.deep.ceiling) {
     warnings.push({
-      type: 'deep',
-      message: `Deep work: ${summary.deep.total.toFixed(1)}h exceeds ceiling (${PRODUCTIVITY_LIMITS.deep.ceiling}h)`,
-      severity: 'error'
+      type: "deep",
+      message: `Deep work: ${summary.deep.totalHours.toFixed(1)}h exceeds ceiling (${PRODUCTIVITY_LIMITS.deep.ceiling}h)`,
+      severity: "error",
     });
-  } else if (summary.deep.total > PRODUCTIVITY_LIMITS.deep.trained.max) {
+  } else if (summary.deep.totalHours > PRODUCTIVITY_LIMITS.deep.trained.max) {
     warnings.push({
-      type: 'deep',
-      message: `Deep work: ${summary.deep.total.toFixed(1)}h exceeds trained limit (${PRODUCTIVITY_LIMITS.deep.trained.max}h)`,
-      severity: 'warning'
+      type: "deep",
+      message: `Deep work: ${summary.deep.totalHours.toFixed(1)}h exceeds trained limit (${PRODUCTIVITY_LIMITS.deep.trained.max}h)`,
+      severity: "warning",
     });
   }
 
-  if (summary.light.total > PRODUCTIVITY_LIMITS.light.ceiling) {
+  // Light
+  if (summary.light.totalHours > PRODUCTIVITY_LIMITS.light.ceiling) {
     warnings.push({
-      type: 'light',
-      message: `Light work: ${summary.light.total.toFixed(1)}h exceeds ceiling (${PRODUCTIVITY_LIMITS.light.ceiling}h)`,
-      severity: 'error'
+      type: "light",
+      message: `Light work: ${summary.light.totalHours.toFixed(1)}h exceeds ceiling (${PRODUCTIVITY_LIMITS.light.ceiling}h)`,
+      severity: "error",
     });
   }
 
-  if (summary.grandTotal > PRODUCTIVITY_LIMITS.total.ceiling) {
+  // Total
+  if (summary.grandTotalHours > PRODUCTIVITY_LIMITS.total.ceiling) {
     warnings.push({
-      type: 'total',
-      message: `Total: ${summary.grandTotal.toFixed(1)}h exceeds daily ceiling (${PRODUCTIVITY_LIMITS.total.ceiling}h)`,
-      severity: 'error'
+      type: "total",
+      message: `Total: ${summary.grandTotalHours.toFixed(1)}h exceeds daily ceiling (${PRODUCTIVITY_LIMITS.total.ceiling}h)`,
+      severity: "error",
     });
   }
 
   return warnings;
 }
+

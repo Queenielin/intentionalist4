@@ -3,7 +3,23 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle, Info } from 'lucide-react';
-import { calculateWorkloadSummary, getWorkloadWarnings, PRODUCTIVITY_LIMITS } from '@/utils/taskAI';
+
+
+import { summarizeByBucket, getWorkloadWarnings } from "@/utils/taskAI";
+
+const summary = summarizeByBucket(tasks);           // tasks: Task[]
+const warnings = getWorkloadWarnings(summary);
+
+// example reads
+summary.deep.totalHours;
+summary.light[30];               // number of 30-min light tasks
+summary.admin[15];
+summary.grandTotalHours;
+
+// render warnings
+warnings.map(w => w.message);
+
+
 import { cn } from '@/lib/utils';
 
 interface WorkloadSummaryProps {

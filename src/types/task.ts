@@ -11,6 +11,26 @@ export type Category8 =
   | "Clerical & Admin Routines"
   | "Logistics & Maintenance";
 
+// --- add below your Category8 / Task exports ---
+
+// 3-bucket rollup used for capacity math (not for UI grouping)
+export type WorkBucket = "deep" | "light" | "admin";
+
+// Map each AI category to a bucket
+export const CATEGORY_TO_BUCKET: Record<Category8, WorkBucket> = {
+  "Analytical × Strategic": "deep",
+  "Creative × Generative": "deep",
+  "Learning × Absorptive": "deep",
+  "Constructive × Building": "deep",
+
+  "Social & Relational": "light",
+  "Critical & Structuring": "light",
+
+  "Clerical & Admin Routines": "admin",
+  "Logistics & Maintenance": "admin",
+};
+
+
 // Convenience: full list you can iterate over in the UI (e.g., columns)
 export const CATEGORIES_8: Category8[] = [
   "Analytical × Strategic",
