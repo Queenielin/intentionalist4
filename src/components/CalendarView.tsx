@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Task } from '@/types/task';
-import { CATEGORY_TO_BUCKET } from '@/types/task';
+import { Task, Category8, CATEGORY_TO_BUCKET } from '@/types/task';
 import { Card } from '@/components/ui/card';
-import { getCategoryColor, getCategoryLabel } from '@/utils/taskAI';
 import { Clock, Trophy, Target, Coffee, Dumbbell, Utensils, Users, Plus, Star, CheckCircle, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,29 +8,30 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { DndContext, DragEndEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
 import { toast } from 'sonner';
-
-// Local type just for user-added breaks in this view
-type BreakSlot = {
-  id: string;
-  time: string;
-  hour: number;
-  minute: 0 | 15 | 30 | 45;
-  isBreak: true;
-  breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other';
-  breakLabel?: string;
-};
 
 interface CalendarViewProps {
   tasks: Task[];
   onTaskUpdate: (tasks: Task[]) => void;
 }
 
+type BreakType = 'exercise' | 'nap' | 'food' | 'meeting' | 'other';
+
+type LocalBreak = {
+  id: string;
+  time: string;
+  hour: number;
+  minute: 0 | 15 | 30 | 45;
+  isBreak: true;
+  breakType: BreakType;
+  breakLabel: string;
+};
+
 export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps) {
-  const [breaks, setBreaks] = useState<BreakSlot[]>([]);
+  const [breaks, setBreaks] = useState<LocalBreak[]>([]);
   const [newBreakTime, setNewBreakTime] = useState('');
-  const [newBreakType, setNewBreakType] = useState<'exercise' | 'nap' | 'food' | 'meeting' | 'other'>('food');
+  const [newBreakType, setNewBreakType] = useState<BreakType>('food');
   const [newBreakLabel, setNewBreakLabel] = useState('');
   const [startTime, setStartTime] = useState('09:00');
   const [scheduleAffectsPlanningOrder, setScheduleAffectsPlanningOrder] = useState(false);
@@ -45,224 +44,163 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
   }, [startTime]);
 
   const timeSlots = useMemo(() => {
-    // 15-minute granularity for flexible scheduling
-    return hourRows.flatMap((hour) => [
+    return hourRows.flatMap((hour) => ([
       { id: `${hour}:00`, time: `${hour}:00`, hour, minute: 0 as const },
       { id: `${hour}:15`, time: `${hour}:15`, hour, minute: 15 as const },
       { id: `${hour}:30`, time: `${hour}:30`, hour, minute: 30 as const },
       { id: `${hour}:45`, time: `${hour}:45`, hour, minute: 45 as const },
-    ]);
+    ]));
   }, [hourRows]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  // Helper: map bucket → CSS bg class
+  const bucketBg = (category?: Category8) => {
+    if (!category) return 'task-light';
+    const bucket = CATEGORY_TO_BUCKET[category];
+    if (bucket === 'deep') return 'task-deep';
+    if (bucket === 'admin') return 'task-admin';
+    return 'task-light';
+  };
+
+  // Build today’s schedule with simple energy-aware ordering
   const scheduleResult = useMemo(() => {
     type ScheduledItem =
-      | {
-          kind: 'task';
-          task: Task;
-          startTime: number; // minutes from day start
-          duration: number; // minutes
-        }
-      | {
-          kind: 'break';
-          label?: string;
-          breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other';
-          startTime: number;
-          duration: number;
-        };
+      | { kind: 'task'; task: Task; startTime: number; duration: number }
+      | { kind: 'break'; label: string; breakType?: BreakType; startTime: number; duration: number };
 
     const [startHour] = startTime.split(':').map(Number);
     const dayStartMinutes = startHour * 60;
 
-    let scheduledItems: ScheduledItem[] = [];
-    let currentTime = dayStartMinutes;
+    const today = tasks.filter(t => t.scheduledDay === 'today' && !t.completed);
 
-    const scheduled = tasks.filter((t) => t.scheduledDay === 'today' && !t.completed);
+    // Separate tasks with manual scheduledStart vs auto
+    const withManual = today.filter(t => !!t.scheduledStart);
+    const toAuto = today.filter(t => !t.scheduledStart);
 
-    // Separate tasks with specific time slots from auto-scheduled tasks
-    const tasksWithTimeSlots = scheduled.filter((t) => t.timeSlot);
-    const tasksForAutoScheduling = scheduled.filter((t) => !t.timeSlot);
+    const items: ScheduledItem[] = [];
 
-    // Add manually scheduled tasks first
-    tasksWithTimeSlots.forEach((task) => {
-      if (task.timeSlot) {
-        const taskTime = new Date(task.timeSlot);
-        const startTimeMinutes = taskTime.getHours() * 60 + taskTime.getMinutes();
-
-        if (task.duration === 60) {
-          // Single 50min block for 1-hour tasks
-          scheduledItems.push({
-            kind: 'task',
-            task,
-            startTime: startTimeMinutes,
-            duration: 50,
-          });
-          // Add automatic 10min break after
-          scheduledItems.push({
-            kind: 'break',
-            label: 'Break',
-            startTime: startTimeMinutes + 50,
-            duration: 10,
-          });
-        } else {
-          scheduledItems.push({
-            kind: 'task',
-            task,
-            startTime: startTimeMinutes,
-            duration: task.duration,
-          });
-        }
-      }
-    });
-
-    // Auto-schedule remaining tasks — by BUCKET (derived from category)
-    const BUCKETS: Array<15 | 30 | 60> = [60, 30, 15];
-    const orderByBuckets = (arr: Task[]) =>
-      BUCKETS.flatMap((d) =>
-        arr
-          .filter((t) => t.duration === d)
-          .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999))
-      );
-
-    const bucketOf = (t: Task) => CATEGORY_TO_BUCKET[t.category];
-
-    const deepTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => bucketOf(t) === 'deep'));
-    const lightTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => bucketOf(t) === 'light'));
-    const adminTasks = orderByBuckets(tasksForAutoScheduling.filter((t) => bucketOf(t) === 'admin'));
-
-    const addTask = (task: Task) => {
-      if (task.duration === 60) {
-        // Single 50min block for 1-hour tasks
-        scheduledItems.push({
-          kind: 'task',
-          task,
-          startTime: currentTime,
-          duration: 50,
-        });
-        currentTime += 50;
-        // Add automatic 10min break after
-        scheduledItems.push({
-          kind: 'break',
-          label: 'Break',
-          startTime: currentTime,
-          duration: 10,
-        });
-        currentTime += 10;
+    // 1) Place manual tasks exactly where requested
+    for (const t of withManual) {
+      const dt = new Date(t.scheduledStart!);
+      const startMin = dt.getHours() * 60 + dt.getMinutes();
+      if (t.duration === 60) {
+        items.push({ kind: 'task', task: t, startTime: startMin, duration: 50 });
+        items.push({ kind: 'break', label: 'Break', startTime: startMin + 50, duration: 10 });
       } else {
-        scheduledItems.push({
-          kind: 'task',
-          task,
-          startTime: currentTime,
-          duration: task.duration,
-        });
-        currentTime += task.duration;
+        items.push({ kind: 'task', task: t, startTime: startMin, duration: t.duration });
+      }
+    }
+
+    // 2) Auto order: deep → light → admin using CATEGORY_TO_BUCKET
+    const byBucketOrder = (list: Task[]) => {
+      const bucketRank = (c?: Category8) => {
+        if (!c) return 99;
+        const b = CATEGORY_TO_BUCKET[c];
+        return b === 'deep' ? 0 : b === 'light' ? 1 : 2;
+      };
+      return [...list].sort((a, b) => {
+        const ra = bucketRank(a.category);
+        const rb = bucketRank(b.category);
+        if (ra !== rb) return ra - rb;
+        // Duration longest first inside a bucket feels better for morning focus
+        if (a.duration !== b.duration) return b.duration - a.duration;
+        return a.title.localeCompare(b.title);
+      });
+    };
+
+    const auto = byBucketOrder(toAuto);
+
+    // Fill timeline after the last manual block or from day start
+    const usedUntil = items.reduce((max, it) => Math.max(max, it.startTime + it.duration), dayStartMinutes);
+    let cursor = Math.max(dayStartMinutes, usedUntil);
+
+    const addTask = (t: Task) => {
+      if (t.duration === 60) {
+        items.push({ kind: 'task', task: t, startTime: cursor, duration: 50 });
+        cursor += 50;
+        items.push({ kind: 'break', label: 'Break', startTime: cursor, duration: 10 });
+        cursor += 10;
+      } else {
+        items.push({ kind: 'task', task: t, startTime: cursor, duration: t.duration });
+        cursor += t.duration;
       }
     };
 
-    // Schedule deep work first
-    deepTasks.forEach(addTask);
+    // Schedule by bucket order
+    for (const t of auto) addTask(t);
 
-    // Add 1-hour break between deep and light work
-    if (deepTasks.length > 0) {
-      scheduledItems.push({
-        kind: 'break',
-        label: 'Break',
-        startTime: currentTime,
-        duration: 60,
-      });
-      currentTime += 60;
+    // Overlay user-added fixed breaks
+    for (const b of breaks) {
+      const startMin = b.hour * 60 + b.minute;
+      items.push({ kind: 'break', label: b.breakLabel || 'Break', breakType: b.breakType, startTime: startMin, duration: 30 });
     }
 
-    // Then light and admin work
-    lightTasks.forEach(addTask);
-    adminTasks.forEach(addTask);
+    items.sort((a, b) => a.startTime - b.startTime);
 
-    // Overlay user-added breaks
-    breaks.forEach((b) => {
-      const breakStartMinutes = b.hour * 60 + b.minute;
-      scheduledItems.push({
-        kind: 'break',
-        label: b.breakLabel || 'Break',
-        breakType: b.breakType,
-        startTime: breakStartMinutes,
-        duration: 30,
-      });
-    });
-
-    // Sort by start time
-    scheduledItems.sort((a, b) => a.startTime - b.startTime);
-
-    return { scheduledItems, hourRows };
+    return { items, hourRows };
   }, [tasks, breaks, hourRows, startTime]);
 
-  const completedTasks = tasks.filter((t) => t.completed);
+  const completedTasks = tasks.filter(t => t.completed);
   const totalTasks = tasks.length;
-  const completionRate = totalTasks > 0 ? (completedTasks.length / totalTasks) * 100 : 0;
+  const completionRate = totalTasks ? (completedTasks.length / totalTasks) * 100 : 0;
 
   const progressTasks = useMemo(
-    () => scheduleResult.scheduledItems.filter((i: any) => i.kind === 'task') as Array<{ task: Task; startTime: number; duration: number }>,
-    [scheduleResult.scheduledItems]
+    () => scheduleResult.items.filter((i): i is Extract<typeof i, { kind: 'task' }>) => i.kind === 'task'),
+    [scheduleResult.items]
+  ) as Array<{ kind: 'task'; task: Task; startTime: number; duration: number }>;
+
+  const totalProgressMinutes = useMemo(
+    () => progressTasks.reduce((sum, i) => sum + i.duration, 0),
+    [progressTasks]
   );
-  const totalProgressMinutes = useMemo(() => progressTasks.reduce((sum, i) => sum + i.duration, 0), [progressTasks]);
 
   const getBreakIcon = (type: string) => {
     switch (type) {
-      case 'exercise':
-        return <Dumbbell className="w-3 h-3" />;
-      case 'nap':
-        return <div className="w-3 h-3 rounded-full bg-current" />;
-      case 'food':
-        return <Utensils className="w-3 h-3" />;
-      case 'meeting':
-        return <Users className="w-3 h-3" />;
-      default:
-        return <Coffee className="w-3 h-3" />;
+      case 'exercise': return <Dumbbell className="w-3 h-3" />;
+      case 'nap': return <div className="w-3 h-3 rounded-full bg-current" />;
+      case 'food': return <Utensils className="w-3 h-3" />;
+      case 'meeting': return <Users className="w-3 h-3" />;
+      default: return <Coffee className="w-3 h-3" />;
     }
   };
 
   const addBreak = () => {
     if (newBreakTime && newBreakLabel) {
       const [hour, minute] = newBreakTime.split(':').map(Number);
-      const slot: BreakSlot = {
-        id: `break-${newBreakTime}`,
+      const b: LocalBreak = {
+        id: `break-${newBreakTime}-${Math.random().toString(36).slice(2, 7)}`,
         time: newBreakTime,
         hour,
-        minute: (minute as 0 | 15 | 30 | 45) ?? 0,
+        minute: (minute as 0 | 15 | 30 | 45),
         isBreak: true,
         breakType: newBreakType,
-        breakLabel: newBreakLabel,
+        breakLabel: newBreakLabel
       };
-      setBreaks((prev) =>
-        [...prev, slot].sort((a, b) => {
-          if (a.hour === b.hour) return a.minute - b.minute;
-          return a.hour - b.hour;
-        })
-      );
+      setBreaks(prev => [...prev, b].sort((a, b) => (a.hour - b.hour) || (a.minute - b.minute)));
       setNewBreakTime('');
       setNewBreakLabel('');
     }
   };
 
   const removeBreak = (breakId: string) => {
-    setBreaks((prev) => prev.filter((b) => b.id !== breakId));
+    setBreaks(prev => prev.filter(b => b.id !== breakId));
   };
 
   const handleTaskComplete = (taskId: string) => {
-    const updatedTasks = tasks.map((task) => (task.id === taskId ? { ...task, completed: !task.completed } : task));
-    onTaskUpdate(updatedTasks);
+    const updated = tasks.map(t => (t.id === taskId ? { ...t, completed: !t.completed } : t));
+    onTaskUpdate(updated);
 
-    const t = tasks.find((t) => t.id === taskId);
+    const t = tasks.find(t => t.id === taskId);
     if (t) {
       if (!t.completed) {
-        // Just marked complete
         toast.success(
           <div className="flex items-center gap-2">
             <CheckCircle className="w-5 h-5 text-green-500" />
             <div>
               <div className="font-medium">Task Completed! 🎉</div>
               <div className="text-sm text-muted-foreground">
-                +{t.duration} XP • {getCategoryLabel(t.category)}
+                +{t.duration} XP • {CATEGORY_TO_BUCKET[t.category!]} bucket
               </div>
             </div>
           </div>
@@ -277,133 +215,28 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
     const { active, over } = event;
     if (!over) return;
 
-    const taskId = active.id as string;
-    const overId = over.id as string;
+    const taskId = String(active.id);
+    const overId = String(over.id);
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
 
-    const activeTask = tasks.find((t) => t.id === taskId);
-    if (!activeTask) return;
-
-    // Handle time slot drops (when dropping on a time slot)
-    if (typeof overId === 'string' && overId.includes(':')) {
-      const [hour, minute] = overId.split(':').map(Number);
-
-      // Update task with new time slot
-      const updatedTasks = tasks.map((task) =>
-        task.id === taskId ? { ...task, timeSlot: new Date(2024, 0, 1, hour, minute).toISOString() } : task
-      );
-
-      // If "Affect Planning Order" is enabled, reorder all tasks based on schedule
-      if (scheduleAffectsPlanningOrder) {
-        const reorderedTasks = reorderTasksBySchedule(updatedTasks);
-        onTaskUpdate(reorderedTasks);
-        toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')} and planning order updated`);
-      } else {
-        onTaskUpdate(updatedTasks);
-        toast.success(`Task moved to ${hour}:${minute.toString().padStart(2, '0')}`);
-      }
-      return;
-    }
-
-    // Reorder within same bucket by dropping over another task
-    const overTask = tasks.find((t) => t.id === overId);
-    if (activeTask && overTask && activeTask.id !== overTask.id) {
-      if (!scheduleAffectsPlanningOrder) {
-        toast.info('Enable "Affect Planning Order" to reorder tasks');
-        return;
-      }
-
-      const activeBucket = CATEGORY_TO_BUCKET[activeTask.category];
-      const overBucket = CATEGORY_TO_BUCKET[overTask.category];
-
-      // Same bucket + same duration → simple reorder
-      if (activeBucket === overBucket && activeTask.duration === overTask.duration) {
-        const cellTasks = tasks
-          .filter((t) => CATEGORY_TO_BUCKET[t.category] === activeBucket && t.duration === activeTask.duration && !t.completed)
-          .sort((a, b) => (a.priority || 999) - (b.priority || 999));
-
-        const filtered = cellTasks.filter((t) => t.id !== activeTask.id);
-        const activeIndex = cellTasks.findIndex((t) => t.id === activeTask.id);
-        const overIndex = filtered.findIndex((t) => t.id === overTask.id);
-        let insertIndex = Math.max(0, overIndex);
-        if (activeIndex !== -1 && activeIndex < cellTasks.findIndex((t) => t.id === overTask.id)) {
-          insertIndex = overIndex + 1; // moving downward -> insert after
-        }
-
-        const newOrderIds = [
-          ...filtered.slice(0, insertIndex).map((t) => t.id),
-          activeTask.id,
-          ...filtered.slice(insertIndex).map((t) => t.id),
-        ];
-
-        const updated = tasks.map((t) => {
-          const idx = newOrderIds.indexOf(t.id);
-          if (idx !== -1) {
-            const newTask = t.id === activeTask.id ? { ...t, timeSlot: undefined } : t;
-            return { ...newTask, priority: idx + 1 };
-          }
-          return t;
-        });
-
-        onTaskUpdate(updated);
-        toast.success('Task order updated in planning list');
-      } else {
-        // Cross-bucket reordering - update global schedule order
-        const updatedTask = { ...activeTask, timeSlot: undefined };
-        const updatedTasks = tasks.map((t) => (t.id === activeTask.id ? updatedTask : t));
-        const reorderedTasks = reorderTasksBySchedule(updatedTasks);
-        onTaskUpdate(reorderedTasks);
-        toast.success('Task order updated across all categories');
-      }
+    // Dropped on a time marker like "13:30"
+    if (overId.includes(':')) {
+      const [h, m] = overId.split(':').map(Number);
+      const iso = new Date(2024, 0, 1, h, m, 0, 0).toISOString();
+      const updated = tasks.map(t => t.id === taskId ? { ...t, scheduledStart: iso } : t);
+      onTaskUpdate(updated);
+      toast.success(`Task scheduled at ${h}:${m.toString().padStart(2, '0')}`);
       return;
     }
 
     toast.info('Task dragged');
   };
 
-  // Helper function to reorder all tasks based on current schedule
-  const reorderTasksBySchedule = (taskList: Task[]) => {
-    // Get the current schedule order
-    const scheduleOrder = scheduleResult.scheduledItems
-      .filter((item) => item.kind === 'task' && item.task)
-      .map((item) => (item as any).task!.id);
-
-    // Group tasks by bucket and duration to maintain grid structure
-    const tasksByCell: Record<string, Task[]> = {};
-    const todayTasks = taskList.filter((t) => t.scheduledDay === 'today' && !t.completed);
-
-    todayTasks.forEach((task) => {
-      const bucket = CATEGORY_TO_BUCKET[task.category];
-      const cellKey = `${bucket}-${task.duration}`;
-      if (!tasksByCell[cellKey]) tasksByCell[cellKey] = [];
-      tasksByCell[cellKey].push(task);
-    });
-
-    // Reorder each cell based on schedule appearance order
-    Object.keys(tasksByCell).forEach((cellKey) => {
-      const cellTasks = tasksByCell[cellKey];
-      cellTasks.sort((a, b) => {
-        const aIndex = scheduleOrder.indexOf(a.id);
-        const bIndex = scheduleOrder.indexOf(b.id);
-
-        if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-        if (aIndex !== -1) return -1;
-        if (bIndex !== -1) return 1;
-        return (a.priority || 999) - (b.priority || 999);
-      });
-
-      // Update priorities within this cell
-      cellTasks.forEach((task, index) => {
-        task.priority = index + 1;
-      });
-    });
-
-    return taskList;
-  };
-
   // Visual scale: 20px per 15 minutes
   const PX_PER_MIN = 20 / 15;
 
-  // Build a single-column timeline: gaps + items (tasks/breaks)
+  // Build a single-column timeline: gaps + items
   const timeline = useMemo(() => {
     const [startHourNum] = startTime.split(':').map(Number);
     const dayStart = startHourNum * 60;
@@ -411,22 +244,22 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
 
     type Segment =
       | { kind: 'gap'; startTime: number; duration: number }
-      | { kind: 'break'; label?: string; breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other'; startTime: number; duration: number }
+      | { kind: 'break'; label: string; breakType?: BreakType; startTime: number; duration: number }
       | { kind: 'task'; task: Task; startTime: number; duration: number };
 
     const segments: Segment[] = [];
     let cursor = dayStart;
 
-    for (const item of scheduleResult.scheduledItems) {
-      if (item.startTime > cursor) {
-        segments.push({ kind: 'gap', startTime: cursor, duration: item.startTime - cursor });
+    for (const it of scheduleResult.items) {
+      if (it.startTime > cursor) {
+        segments.push({ kind: 'gap', startTime: cursor, duration: it.startTime - cursor });
       }
-      if (item.kind === 'task') {
-        segments.push({ kind: 'task', task: (item as any).task, startTime: item.startTime, duration: item.duration });
+      if (it.kind === 'task') {
+        segments.push({ kind: 'task', task: it.task, startTime: it.startTime, duration: it.duration });
       } else {
-        segments.push({ kind: 'break', label: item.label, breakType: item.breakType, startTime: item.startTime, duration: item.duration });
+        segments.push({ kind: 'break', label: it.label, breakType: it.breakType, startTime: it.startTime, duration: it.duration });
       }
-      cursor = item.startTime + item.duration;
+      cursor = it.startTime + it.duration;
     }
 
     if (cursor < dayEnd) {
@@ -434,12 +267,12 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
     }
 
     return { segments, startHourNum, dayStart, dayEnd };
-  }, [scheduleResult.scheduledItems, startTime, dayLength]);
+  }, [scheduleResult.items, startTime, dayLength]);
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="space-y-6">
-        {/* Progress Stats */}
+        {/* Progress */}
         <Card className="p-6 bg-gradient-to-r from-background to-muted/30 border-0 shadow-lg">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -453,15 +286,15 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
           <div className="mt-4 space-y-2">
             <div className="flex items-center gap-2 h-8 rounded-lg border border-border bg-muted/30 overflow-hidden">
               {progressTasks.map((it, idx) => {
-                const widthPercent = totalProgressMinutes > 0 ? (it.duration / totalProgressMinutes) * 100 : 0;
+                const widthPercent = totalProgressMinutes ? (it.duration / totalProgressMinutes) * 100 : 0;
                 const isPriority = !!it.task.isPriority;
                 return (
                   <div
                     key={idx}
                     className={cn(
-                      'h-full border-r last:border-r-0 border-border/50 relative flex items-center justify-center text-xs font-medium',
-                      getCategoryColor(it.task.category),
-                      it.task.completed && 'opacity-40 line-through'
+                      "h-full border-r last:border-r-0 border-border/50 relative flex items-center justify-center text-xs font-medium",
+                      bucketBg(it.task.category),
+                      it.task.completed && "opacity-40 line-through"
                     )}
                     style={{ width: `${widthPercent}%` }}
                     title={`${it.task.title} • ${it.duration}m${isPriority ? ' • Priority' : ''}`}
@@ -474,11 +307,13 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
                 );
               })}
             </div>
-            <p className="text-sm text-muted-foreground">{completionRate.toFixed(0)}% completed • Keep up the great work!</p>
+            <p className="text-sm text-muted-foreground">
+              {completionRate.toFixed(0)}% completed • Keep up the great work!
+            </p>
           </div>
         </Card>
 
-        {/* Add Break Section */}
+        {/* Add Break */}
         <Card className="p-4 border-0 shadow-lg bg-muted/30">
           <h4 className="font-medium mb-3 flex items-center gap-2">
             <Plus className="w-4 h-4" />
@@ -498,7 +333,7 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
               </SelectContent>
             </Select>
 
-            <Select value={newBreakType} onValueChange={(value: any) => setNewBreakType(value)}>
+            <Select value={newBreakType} onValueChange={(v: BreakType) => setNewBreakType(v)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -511,15 +346,17 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
               </SelectContent>
             </Select>
 
-            <Input placeholder="Label (e.g., Lunch)" value={newBreakLabel} onChange={(e) => setNewBreakLabel(e.target.value)} />
+            <Input
+              placeholder="Label (e.g., Lunch)"
+              value={newBreakLabel}
+              onChange={(e) => setNewBreakLabel(e.target.value)}
+            />
 
-            <Button onClick={addBreak} size="sm">
-              Add Break
-            </Button>
+            <Button onClick={addBreak} size="sm">Add Break</Button>
           </div>
         </Card>
 
-        {/* Calendar Schedule */}
+        {/* Timeline */}
         <Card className="p-6 border-0 shadow-lg">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
@@ -529,10 +366,12 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Settings className="w-4 h-4 text-muted-foreground" />
-                <Label htmlFor="schedule-affects-order" className="text-sm">
-                  Affect Planning Order
-                </Label>
-                <Switch id="schedule-affects-order" checked={scheduleAffectsPlanningOrder} onCheckedChange={setScheduleAffectsPlanningOrder} />
+                <Label htmlFor="schedule-affects-order" className="text-sm">Affect Planning Order</Label>
+                <Switch
+                  id="schedule-affects-order"
+                  checked={scheduleAffectsPlanningOrder}
+                  onCheckedChange={setScheduleAffectsPlanningOrder}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Start time</span>
@@ -541,87 +380,7 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
             </div>
           </div>
 
-          <div className="relative">
-            {/* Overlay hour grid with labels aligned to the line (left) */}
-            <div className="absolute inset-0 pointer-events-none">
-              {Array.from({ length: dayLength + 1 }).map((_, i) => {
-                const hour = timeline.startHourNum + i;
-                const top = i * 60 * PX_PER_MIN; // px from day start
-                const isCurrentHour = new Date().getHours() === hour;
-                return (
-                  <div key={hour} className="absolute left-0 right-0" style={{ top }}>
-                    <div className="absolute left-0 -mt-2 text-sm font-medium text-foreground flex items-center gap-1 bg-background pr-2">
-                      <Clock className="w-3 h-3 opacity-70" />
-                      {hour}:00
-                    </div>
-                    <div className={cn('border-t border-muted-foreground/20 w-full', isCurrentHour && 'border-primary/50')} />
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Single column stacked timeline */}
-            <div className="pl-20">
-              {timeline.segments.map((seg, i) => {
-                if (seg.kind === 'gap') {
-                  const gapHeight = Math.max(20, seg.duration * PX_PER_MIN); // Minimum 20px for drop targets
-                  const h = Math.floor(seg.startTime / 60);
-                  const m = seg.startTime % 60;
-
-                  return (
-                    <TimeSlotDropZone key={`gap-${i}`} timeSlot={`${h}:${m.toString().padStart(2, '0')}`}>
-                      <div style={{ height: `${gapHeight}px` }} className="relative group">
-                        {gapHeight >= 40 && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-xs text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
-                              Drop here for {h}:{m.toString().padStart(2, '0')}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </TimeSlotDropZone>
-                  );
-                }
-
-                if (seg.kind === 'break') {
-                  const h = Math.floor(seg.startTime / 60);
-                  const m = seg.startTime % 60;
-                  return (
-                    <div
-                      key={`break-${i}`}
-                      className="rounded text-xs flex items-center justify-between border border-background/20 bg-amber-500/20"
-                      style={{ height: `${seg.duration * PX_PER_MIN}px` }}
-                    >
-                      <div className="w-full h-full px-3 py-2 flex items-center justify-between">
-                        <span className="truncate font-medium">{seg.label || 'Break'}</span>
-                        <div className="flex items-center gap-2 text-xs opacity-70">
-                          <span>
-                            {h}:{m.toString().padStart(2, '0')}
-                          </span>
-                          <span>{seg.duration}m</span>
-                          {seg.breakType && getBreakIcon(seg.breakType)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                const h = Math.floor(seg.startTime / 60);
-                const m = seg.startTime % 60;
-                return (
-                  <DraggableTask
-                    key={`task-${seg.task.id}-${i}`}
-                    task={seg.task}
-                    startTime={h}
-                    startMinute={m}
-                    duration={seg.duration}
-                    blockHeight={seg.duration * PX_PER_MIN}
-                    onComplete={handleTaskComplete}
-                  />
-                );
-              })}
-            </div>
-          </div>
+          <Timeline hourRows={hourRows} timeline={timeline} onComplete={handleTaskComplete} />
         </Card>
 
         {/* Legend */}
@@ -630,15 +389,15 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full task-deep"></div>
-              <span>Deep Work (Morning)</span>
+              <span>Deep (Morning)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full task-light"></div>
-              <span>Light Work (Midday)</span>
+              <span>Light (Midday)</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full task-admin"></div>
-              <span>Admin Work (Afternoon)</span>
+              <span>Admin (Afternoon)</span>
             </div>
           </div>
         </Card>
@@ -647,14 +406,125 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
   );
 }
 
-// Draggable Task Component
+function Timeline({
+  hourRows,
+  timeline,
+  onComplete,
+}: {
+  hourRows: number[];
+  timeline: {
+    segments: Array<
+      | { kind: 'gap'; startTime: number; duration: number }
+      | { kind: 'break'; label: string; breakType?: BreakType; startTime: number; duration: number }
+      | { kind: 'task'; task: Task; startTime: number; duration: number }
+    >;
+    startHourNum: number;
+    dayStart: number;
+    dayEnd: number;
+  };
+  onComplete: (taskId: string) => void;
+}) {
+  const PX_PER_MIN = 20 / 15;
+
+  return (
+    <div className="relative">
+      {/* hour grid */}
+      <div className="absolute inset-0 pointer-events-none">
+        {Array.from({ length: hourRows.length + 1 }).map((_, i) => {
+          const hour = timeline.startHourNum + i;
+          const top = i * 60 * PX_PER_MIN;
+          const isCurrentHour = new Date().getHours() === hour;
+          return (
+            <div key={hour} className="absolute left-0 right-0" style={{ top }}>
+              <div className="absolute left-0 -mt-2 text-sm font-medium text-foreground flex items-center gap-1 bg-background pr-2">
+                <Clock className="w-3 h-3 opacity-70" />
+                {hour}:00
+              </div>
+              <div className={cn(
+                "border-t border-muted-foreground/20 w-full",
+                isCurrentHour && "border-primary/50"
+              )} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* column */}
+      <div className="pl-20">
+        {timeline.segments.map((seg, i) => {
+          if (seg.kind === 'gap') {
+            const gapHeight = Math.max(20, seg.duration * PX_PER_MIN);
+            const h = Math.floor(seg.startTime / 60);
+            const m = seg.startTime % 60;
+            return (
+              <TimeSlotDropZone key={`gap-${i}`} timeSlot={`${h}:${m.toString().padStart(2, '0')}`}>
+                <div style={{ height: `${gapHeight}px` }} className="relative group">
+                  {gapHeight >= 40 && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-xs text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+                        Drop here for {h}:{m.toString().padStart(2, '0')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </TimeSlotDropZone>
+            );
+          }
+
+          if (seg.kind === 'break') {
+            const h = Math.floor(seg.startTime / 60);
+            const m = seg.startTime % 60;
+            return (
+              <div
+                key={`break-${i}`}
+                className="rounded text-xs flex items-center justify-between border border-background/20 bg-amber-500/20"
+                style={{ height: `${seg.duration * PX_PER_MIN}px` }}
+              >
+                <div className="w-full h-full px-3 py-2 flex items-center justify-between">
+                  <span className="truncate font-medium">{seg.label || 'Break'}</span>
+                  <div className="flex items-center gap-2 text-xs opacity-70">
+                    <span>{h}:{m.toString().padStart(2, '0')}</span>
+                    <span>{seg.duration}m</span>
+                    {seg.breakType && (
+                      seg.breakType === 'exercise' ? <Dumbbell className="w-3 h-3" /> :
+                      seg.breakType === 'food' ? <Utensils className="w-3 h-3" /> :
+                      seg.breakType === 'meeting' ? <Users className="w-3 h-3" /> :
+                      seg.breakType === 'nap' ? <div className="w-3 h-3 rounded-full bg-current" /> :
+                      <Coffee className="w-3 h-3" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          const h = Math.floor(seg.startTime / 60);
+          const m = seg.startTime % 60;
+          return (
+            <DraggableTask
+              key={`task-${seg.task.id}-${i}`}
+              task={seg.task}
+              startTime={h}
+              startMinute={m}
+              duration={seg.duration}
+              blockHeight={seg.duration * PX_PER_MIN}
+              onComplete={onComplete}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Draggable Task
 function DraggableTask({
   task,
   startTime,
   startMinute,
   duration,
   blockHeight,
-  onComplete,
+  onComplete
 }: {
   task: Task;
   startTime: number;
@@ -663,47 +533,42 @@ function DraggableTask({
   blockHeight: number;
   onComplete: (taskId: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: task.id,
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
 
   const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined;
+
+  const bucketBg = (category?: Category8) => {
+    if (!category) return 'task-light';
+    const bucket = CATEGORY_TO_BUCKET[category];
+    if (bucket === 'deep') return 'task-deep';
+    if (bucket === 'admin') return 'task-admin';
+    return 'task-light';
+  };
 
   return (
     <div
       ref={setNodeRef}
-      style={{
-        ...style,
-        height: `${blockHeight}px`,
-        opacity: isDragging ? 0.5 : 1,
-      }}
+      style={{ ...style, height: `${blockHeight}px`, opacity: isDragging ? 0.5 : 1 }}
       {...listeners}
       {...attributes}
       className={cn(
-        'rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20 cursor-grab active:cursor-grabbing',
-        getCategoryColor(task.category),
-        task.completed && 'opacity-60 line-through'
+        "rounded px-3 py-2 text-xs flex items-center justify-between border border-background/20 cursor-grab active:cursor-grabbing",
+        bucketBg(task.category),
+        task.completed && "opacity-60 line-through"
       )}
     >
       <span className="truncate font-medium">{task.title}</span>
       <div className="flex items-center gap-2 text-xs opacity-70">
-        <span>
-          {startTime}:{startMinute.toString().padStart(2, '0')}
-        </span>
+        <span>{startTime}:{startMinute.toString().padStart(2, '0')}</span>
         <span>{duration}m</span>
         {!task.completed && (
           <Button
             size="sm"
             variant="ghost"
             className="w-5 h-5 p-0 hover:bg-white/20"
-            onClick={(e) => {
-              e.stopPropagation();
-              onComplete(task.id);
-            }}
+            onClick={(e) => { e.stopPropagation(); onComplete(task.id); }}
           >
             <CheckCircle className="w-3 h-3" />
           </Button>
@@ -714,16 +579,17 @@ function DraggableTask({
   );
 }
 
-// Time Slot Drop Zone Component
+// Drop zone per time marker
 function TimeSlotDropZone({ timeSlot, children }: { timeSlot: string; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: timeSlot,
-  });
+  const { setNodeRef, isOver } = useDroppable({ id: timeSlot });
 
   return (
     <div
       ref={setNodeRef}
-      className={cn('transition-colors rounded', isOver && 'bg-primary/10 border-2 border-primary/30 border-dashed')}
+      className={cn(
+        "transition-colors rounded",
+        isOver && "bg-primary/10 border-2 border-primary/30 border-dashed"
+      )}
     >
       {children}
     </div>
