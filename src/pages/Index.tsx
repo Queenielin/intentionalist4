@@ -1,227 +1,94 @@
-import { useState } from 'react';
-import { Task, Category8 } from '@/types/task';
-import TaskInput from '@/components/TaskInput';
-import TaskList from '@/components/TaskList';
-import CalendarView from '@/components/CalendarView';
-import TaskGrid from '@/components/TaskGrid';
-import WorkloadSummary from '@/components/WorkloadSummary';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+// src/components/TaskInput.tsx
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ListTodo, Calendar, Brain } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea'; // ⬅️ use shadcn Textarea (or swap to native <textarea>)
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const Index = () => {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const { toast } = useToast();
+interface TaskInputProps {
+  // Parent creates the Task, AI fills { title, category, duration } later.
+  onAddTask: (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
+}
 
-  const handleAddTask = (
-    title: string, 
-    category: Category8, 
-    duration: 15 | 30 | 60, 
-    isCategorizing: boolean = false, 
-    tempId?: string,
-    taskType?: string,
-    scheduledDay: 'today' | 'tomorrow' = 'today'
-  ) => {
-    const taskId = tempId || crypto.randomUUID();
-    
-    // If tempId exists, update existing task
-    if (tempId) {
-      setTasks(prev => prev.map(task => 
-        task.id === tempId 
-          ? { ...task, title, category, duration, isCategorizing, taskType }
-          : task
-      ));
-      
-      if (!isCategorizing) {
-        toast({
-          title: "Task updated!",
-          description: `Categorized as ${category} (${duration} min)`,
-        });
-      }
+export default function TaskInput({ onAddTask }: TaskInputProps) {
+  const [value, setValue] = useState('');
+  const [duration, setDuration] = useState<15 | 30 | 60>(30);
+  const [scheduledDay, setScheduledDay] = useState<'today' | 'tomorrow'>('today');
+
+  const addOne = useCallback((title: string) => {
+    const t = title.trim();
+    if (!t) return;
+    onAddTask(t, duration, scheduledDay);
+  }, [onAddTask, duration, scheduledDay]);
+
+  const handleSubmit = useCallback(() => {
+    // Split by lines, ignore empties
+    const lines = value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    lines.forEach(addOne);
+    setValue('');
+  }, [value, addOne]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // ⌘/Ctrl + Enter submits
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
       return;
     }
-
-    // Create new task
-    const newTask: Task = {
-      id: taskId,
-      title,
-      category,
-      duration,
-      completed: false,
-      scheduledDay,
-      createdAt: new Date(),
-      isCategorizing,
-      taskType,
-      slotId: '', // Will be assigned when slots are created
-    };
-
-    setTasks(prev => [...prev, newTask]);
-    
-    if (!isCategorizing) {
-      toast({
-        title: "Task added!",
-        description: `Categorized as ${category} (${duration} min)`,
-      });
-    }
-  };
-
-  const handleDuplicateTask = (task: Task) => {
-    const duplicatedTask: Task = {
-      ...task,
-      id: crypto.randomUUID(),
-      title: `${task.title} (copy)`,
-      createdAt: new Date(),
-    };
-
-    setTasks(prev => [...prev, duplicatedTask]);
-    toast({
-      title: "Task duplicated!",
-      description: "Task copied successfully",
-    });
-  };
-
-  const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, ...updates } : task
-    ));
-  };
-
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
-    toast({
-      title: "Task deleted",
-      description: "Task removed from your list",
-      variant: "destructive",
-    });
-  };
-
-  const handleCompleteTask = (taskId: string) => {
-    setTasks(prev => prev.map(task => {
-      if (task.id === taskId) {
-        const newCompleted = !task.completed;
-        if (newCompleted) {
-          toast({
-            title: "Great job! 🎉",
-            description: "Task completed successfully",
-          });
-        }
-        return { ...task, completed: newCompleted };
-      }
-      return task;
-    }));
+    // Plain Enter should create a newline — do not preventDefault.
+    // Shift+Enter also naturally makes a newline.
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header */}
-        <header className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Brain className="w-8 h-8 text-primary" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-              Energy Cycle Planner
-            </h1>
-          </div>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Optimize your day with AI-powered task categorization based on your natural energy cycles
-          </p>
-        </header>
-
-        {/* Task Input */}
-        <div className="mb-8">
-          <TaskInput onAddTask={(title, duration, scheduledDay) => 
-            handleAddTask(title, 'Learning × Absorptive', duration, true, undefined, undefined, scheduledDay)
-          } />
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+      <div className="flex-1 space-y-1">
+        <Textarea
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={6}
+          className="resize-y"
+          placeholder={`One task per line, e.g.:
+1 journal & analysis
+Reply to LinkedIn
+Study adhd class - adhd content of the day
+reply to Specialsterm AU
+reply to bali Airbnb
+write google review
+...`}
+          spellCheck
+        />
+        <div className="text-xs text-muted-foreground">
+          Press <kbd className="px-1">⌘/Ctrl</kbd>+<kbd className="px-1">Enter</kbd> to add all lines. Enter adds a new line.
         </div>
+      </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="planning" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50 rounded-xl">
-            <TabsTrigger 
-              value="planning" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <ListTodo className="w-4 h-4" />
-              Task Planning
-            </TabsTrigger>
-            <TabsTrigger 
-              value="calendar" 
-              className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              <Calendar className="w-4 h-4" />
-              Schedule View
-            </TabsTrigger>
-          </TabsList>
+      <div className="flex gap-2 sm:flex-col sm:w-[260px]">
+        <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v) as 15 | 30 | 60)}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Duration" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="15">15 min</SelectItem>
+            <SelectItem value="30">30 min</SelectItem>
+            <SelectItem value="60">60 min</SelectItem>
+          </SelectContent>
+        </Select>
 
-          <TabsContent value="planning" className="mt-6 space-y-8">
-            {/* Today's main grid - full width */}
-            <TaskGrid
-              tasks={tasks}
-              day="today"
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onDuplicateTask={handleDuplicateTask}
-              onCompleteTask={handleCompleteTask}
-              onAddTask={(title, category, duration, scheduledDay) => 
-                handleAddTask(title, category, duration, false, undefined, undefined, scheduledDay)
-              }
-            />
+        <Select value={scheduledDay} onValueChange={(v: 'today' | 'tomorrow') => setScheduledDay(v)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Day" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="tomorrow">Tomorrow</SelectItem>
+          </SelectContent>
+        </Select>
 
-            {/* Tomorrow's simple column */}
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold">Tomorrow</h3>
-              <div className="bg-muted/30 rounded-lg p-4 border-2 border-dashed border-muted-foreground/20">
-                <div className="space-y-2">
-                  {tasks.filter(task => task.scheduledDay === 'tomorrow' && !task.completed).map(task => (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-3 p-3 bg-background rounded-lg border hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium">{task.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {task.category} • {task.duration}min
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleUpdateTask(task.id, { scheduledDay: 'today' })}
-                          className="text-xs"
-                        >
-                          Move to Today
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteTask(task.id)}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                  {tasks.filter(task => task.scheduledDay === 'tomorrow' && !task.completed).length === 0 && (
-                    <p className="text-center text-muted-foreground py-8">
-                      No tasks scheduled for tomorrow
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-
-          <TabsContent value="calendar" className="mt-6">
-            <CalendarView tasks={tasks} onTaskUpdate={setTasks} />
-          </TabsContent>
-        </Tabs>
+        <Button onClick={handleSubmit} className="whitespace-nowrap">
+          Add Tasks
+        </Button>
       </div>
     </div>
   );
-};
-
-export default Index;
+}
