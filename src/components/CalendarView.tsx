@@ -146,9 +146,9 @@ export default function CalendarView({ tasks, onTaskUpdate }: CalendarViewProps)
   const completionRate = totalTasks ? (completedTasks.length / totalTasks) * 100 : 0;
 
   const progressTasks = useMemo(
-    () => scheduleResult.items.filter((i): i is Extract<typeof i, { kind: 'task' }>) => i.kind === 'task'),
+    () => scheduleResult.items.filter((i): i is Extract<typeof i, { kind: 'task' }> => i.kind === 'task'),
     [scheduleResult.items]
-  ) as Array<{ kind: 'task'; task: Task; startTime: number; duration: number }>;
+  );
 
   const totalProgressMinutes = useMemo(
     () => progressTasks.reduce((sum, i) => sum + i.duration, 0),

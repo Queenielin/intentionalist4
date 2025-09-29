@@ -80,6 +80,7 @@ export interface Task {
 
   // Optional UI metadata
   scheduledDay?: "today" | "tomorrow";
+  scheduledStart?: string;      // ISO date string for calendar scheduling
   priority?: number;
   isPriority?: boolean;
   createdAt: Date;

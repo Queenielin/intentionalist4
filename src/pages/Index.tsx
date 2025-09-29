@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Task, WorkType } from '@/types/task';
+import { Task, Category8 } from '@/types/task';
 import TaskInput from '@/components/TaskInput';
 import TaskList from '@/components/TaskList';
 import CalendarView from '@/components/CalendarView';
@@ -16,7 +16,7 @@ const Index = () => {
 
   const handleAddTask = (
     title: string, 
-    workType: WorkType, 
+    category: Category8, 
     duration: 15 | 30 | 60, 
     isCategorizing: boolean = false, 
     tempId?: string,
@@ -29,14 +29,14 @@ const Index = () => {
     if (tempId) {
       setTasks(prev => prev.map(task => 
         task.id === tempId 
-          ? { ...task, title, workType, duration, isCategorizing, taskType }
+          ? { ...task, title, category, duration, isCategorizing, taskType }
           : task
       ));
       
       if (!isCategorizing) {
         toast({
           title: "Task updated!",
-          description: `Categorized as ${workType} work (${duration} min)`,
+          description: `Categorized as ${category} (${duration} min)`,
         });
       }
       return;
@@ -46,13 +46,14 @@ const Index = () => {
     const newTask: Task = {
       id: taskId,
       title,
-      workType,
+      category,
       duration,
       completed: false,
       scheduledDay,
       createdAt: new Date(),
       isCategorizing,
       taskType,
+      slotId: '', // Will be assigned when slots are created
     };
 
     setTasks(prev => [...prev, newTask]);
@@ -60,7 +61,7 @@ const Index = () => {
     if (!isCategorizing) {
       toast({
         title: "Task added!",
-        description: `Categorized as ${workType} work (${duration} min)`,
+        description: `Categorized as ${category} (${duration} min)`,
       });
     }
   };
@@ -129,7 +130,9 @@ const Index = () => {
 
         {/* Task Input */}
         <div className="mb-8">
-          <TaskInput onAddTask={handleAddTask} />
+          <TaskInput onAddTask={(title, duration, scheduledDay) => 
+            handleAddTask(title, 'Learning × Absorptive', duration, true, undefined, undefined, scheduledDay)
+          } />
         </div>
 
         {/* Main Content Tabs */}
@@ -160,8 +163,8 @@ const Index = () => {
               onDeleteTask={handleDeleteTask}
               onDuplicateTask={handleDuplicateTask}
               onCompleteTask={handleCompleteTask}
-              onAddTask={(title, workType, duration, scheduledDay) => 
-                handleAddTask(title, workType, duration, false, undefined, undefined, scheduledDay)
+              onAddTask={(title, category, duration, scheduledDay) => 
+                handleAddTask(title, category, duration, false, undefined, undefined, scheduledDay)
               }
             />
 
@@ -178,7 +181,7 @@ const Index = () => {
                       <div className="flex-1">
                         <p className="font-medium">{task.title}</p>
                         <p className="text-sm text-muted-foreground">
-                          {task.workType} work • {task.duration}min
+                          {task.category} • {task.duration}min
                         </p>
                       </div>
                       <div className="flex gap-2">

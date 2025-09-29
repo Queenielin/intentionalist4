@@ -62,7 +62,7 @@ export function createSlots(tasks: Task[]): { slots: Slot[]; unassignedTasks: Ta
     const smallClusters = clusterBySimilarity(small);
     const smallSlots: Slot[] = [];
     for (const cluster of smallClusters) {
-      const packed = packIntoSlots(cluster, MAX_SLOT_MINUTES);
+      const packed = packIntoSlots(cluster.tasks, MAX_SLOT_MINUTES);
       packed.forEach((tasksInSlot, idx) => {
         // keep related clusters close with a stable id stem
         smallSlots.push(

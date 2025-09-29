@@ -57,16 +57,16 @@ export function extractTimeDuration(title: string): {
   // Task duration patterns (strip from title)
   const patterns: Array<{ re: RegExp; unit?: "m" | "h" }> = [
     // Prefix
-    [/^(\d+)\s*(?:hours?|hrs?|h)\s*[-:]?\s*/i, "h"],
-    [/^(\d+)\s*(?:minutes?|mins?|m)\s*[-:]?\s*/i, "m"],
+    { re: /^(\d+)\s*(?:hours?|hrs?|h)\s*[-:]?\s*/i, unit: "h" },
+    { re: /^(\d+)\s*(?:minutes?|mins?|m)\s*[-:]?\s*/i, unit: "m" },
     // Suffix
-    [/\s*[-:]\s*(\d+)\s*(?:hours?|hrs?|h)$/i, "h"],
-    [/\s*[-:]\s*(\d+)\s*(?:minutes?|mins?|m)$/i, "m"],
+    { re: /\s*[-:]\s*(\d+)\s*(?:hours?|hrs?|h)$/i, unit: "h" },
+    { re: /\s*[-:]\s*(\d+)\s*(?:minutes?|mins?|m)$/i, unit: "m" },
     // Phrases
-    [/(?:takes?|will take|need|needs|requires?|allocate|spend)\s*(\d+)\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/i],
-    [/(?:in|within|over)\s*(\d+)\s*(?:hours?|hrs?|h)\b/i, "h"],
-    [/(?:in|within|over)\s*(\d+)\s*(?:minutes?|mins?|m)\b/i, "m"],
-  ].map(([re, unit]) => ({ re, unit }));
+    { re: /(?:takes?|will take|need|needs|requires?|allocate|spend)\s*(\d+)\s*(?:hours?|hrs?|h|minutes?|mins?|m)\b/i },
+    { re: /(?:in|within|over)\s*(\d+)\s*(?:hours?|hrs?|h)\b/i, unit: "h" },
+    { re: /(?:in|within|over)\s*(\d+)\s*(?:minutes?|mins?|m)\b/i, unit: "m" },
+  ];
 
   for (const { re, unit } of patterns) {
     const m = t.match(re);
