@@ -19,7 +19,10 @@ interface TaskGridProps {
   onDuplicateTask: (task: Task) => void; // kept if you still call it elsewhere
   onCompleteTask: (taskId: string) => void;
   onAddTask: (
-    input: string
+    title: string,
+    category: Category8,
+    duration: 15 | 30 | 60,
+    scheduledDay?: 'today' | 'tomorrow'
   ) => void;
 }
 
@@ -106,7 +109,7 @@ export default function TaskGrid({
                       if (e.key === 'Enter') {
                         const title = (e.target as HTMLInputElement).value.trim();
                         if (title) {
-                          onAddTask(title);
+                          onAddTask(title, category, 30, day);
                           (e.target as HTMLInputElement).value = '';
                         }
                       }

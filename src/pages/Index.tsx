@@ -4,72 +4,27 @@ import TaskInput from '@/components/TaskInput';
 import TaskGrid from '@/components/TaskGrid';
 import CalendarView from '@/components/CalendarView';
 import WorkloadSummary from '@/components/WorkloadSummary';
-import { categorizeTasksWithAI } from '@/utils/aiCategorization';
-import { parseTaskInput } from '@/utils/taskAI';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, List } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function Index() {
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const handleAddTask = useCallback(async (input: string) => {
-    if (!input.trim()) return;
-
-    // Parse the input into individual tasks
-    const parsedTasks = parseTaskInput(input);
-    if (parsedTasks.length === 0) return;
-
-    // Create temporary tasks with loading state
-    const tempTasks: Task[] = parsedTasks.map(parsed => ({
+  const handleAddTask = useCallback((title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+    const newTask: Task = {
       id: crypto.randomUUID(),
-      title: parsed.title,
-      category: 'Social & Relational' as Category8, // Temporary default
-      duration: parsed.duration,
+      title,
+      category: 'Clerical & Admin Routines' as Category8, // Default category until AI categorizes
+      duration,
       completed: false,
       slotId: 'default-slot',
-      scheduledDay: 'today' as const,
+      scheduledDay: scheduledDay || 'today',
       createdAt: new Date(),
-      isCategorizing: true,
-    }));
+      isCategorizing: true, // Show loading state while AI processes
+    };
 
-    // Add temporary tasks to state
-    setTasks(prev => [...prev, ...tempTasks]);
-
-    try {
-      // Get AI categorization
-      const taskTitles = parsedTasks.map(t => t.title);
-      const classifications = await categorizeTasksWithAI(taskTitles);
-
-      // Update tasks with AI results
-      setTasks(prev => prev.map(task => {
-        const tempIndex = tempTasks.findIndex(t => t.id === task.id);
-        if (tempIndex !== -1 && classifications[tempIndex]) {
-          const classification = classifications[tempIndex];
-          return {
-            ...task,
-            title: classification.title,
-            category: classification.category,
-            duration: classification.duration,
-            isCategorizing: false,
-          };
-        }
-        return task;
-      }));
-
-      toast.success(`Added ${classifications.length} task${classifications.length > 1 ? 's' : ''} and categorized with AI`);
-    } catch (error) {
-      console.error('Failed to categorize tasks:', error);
-      // Remove loading state even if categorization failed
-      setTasks(prev => prev.map(task => {
-        if (tempTasks.some(t => t.id === task.id)) {
-          return { ...task, isCategorizing: false };
-        }
-        return task;
-      }));
-      toast.error('Failed to categorize tasks with AI, using defaults');
-    }
+    setTasks(prev => [...prev, newTask]);
   }, []);
 
   const handleUpdateTask = useCallback((taskId: string, updates: Partial<Task>) => {

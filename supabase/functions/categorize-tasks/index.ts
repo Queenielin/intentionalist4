@@ -25,8 +25,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const GEMINI_API_KEY = "AIzaSyBspeSAHNujKWDfgjG5UcMZIbpPIvEdPfw";
-    console.log("GEMINI_API_KEY:", GEMINI_API_KEY ? "SET" : "NOT SET");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "GEMINI_API_KEY is not set" }), {
         status: 500,
@@ -197,7 +196,8 @@ async function classifyTasks(tasks: string[], apiKey: string) {
   const pre = tasks.map(extractTimeHint);
   const cleaned = pre.map((p) => p.title);
 
-  const prompt = `You are an advanced task classifier using cognitive science principles.
+
+const prompt = `You are an advanced task classifier using cognitive science principles.
 Classify each task into ONE of these 8 categories, then assign a duration (15, 30, 60).
 
 CRITICAL: Your response must be ONLY valid JSON - no explanations, no markdown, no code fences.
@@ -209,19 +209,9 @@ CATEGORIES (cognitive definitions):
 3. "Learning × Absorptive" = reading/studying/encoding new material (input-heavy, not output).
 4. "Constructive × Building" = hands-on implementation/prototyping, chaining micro-decisions into a build.
 5. "Social & Relational" = communication & coordination: replies, follow-ups, team alignment, messaging.
-6. "Critical & Structuring" = review/organization/editing: proofreading, feedback, editing, task board updates, short plans, quality control.
+6. "Critical & Structuring" = review/organization: proofreading, feedback, task board updates, short plans.
 7. "Clerical & Admin Routines" = routine logging/compliance: expenses, invoices, forms, data entry.
 8. "Logistics & Maintenance" = scheduling, calendar, file/folder/backup/tool hygiene.
-
-EXAMPLES:
-- "Proofreading a document" → "Critical & Structuring" (60min)
-- "Reply to emails" → "Social & Relational" (15min)
-- "Write a blog post" → "Creative × Generative" (60min)
-- "Research market trends" → "Learning × Absorptive" (60min)
-- "Debug code issue" → "Analytical × Strategic" (30min)
-- "Build new feature" → "Constructive × Building" (60min)
-- "File expenses" → "Clerical & Admin Routines" (15min)
-- "Schedule meetings" → "Logistics & Maintenance" (15min)
 
 DURATION GUIDELINES:
 - 15 → quick replies, simple admin, brief reviews, short coordination
@@ -231,7 +221,7 @@ DURATION GUIDELINES:
 Tie-break rules:
 - If multiple actions: choose the DOMINANT one (latest verb or biggest effort).
 - If ambiguous: pick the category needing MORE focus (bias upward).
-- Duration: "proofreading" is typically 60min for focus, "quick review" is 15min.
+- Duration can be shortened if the task clearly signals small scale (e.g. "1 email" = 15, "20 emails" = 60).
 
 OUTPUT FORMAT:
 [{ "title": "<cleaned task text>", "category": "<one of 8>", "duration": 15|30|60 }]
@@ -240,40 +230,38 @@ Tasks:
 ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
 `;
 
-  const model = await resolveGeminiModel(apiKey);
+const model = await resolveGeminiModel(apiKey);
 
-  const callGen = async (modelName: string) => {
-    return fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+const callGen = async (modelName: string) => {
+  return fetch(
+ `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 512,
         },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
-  };
-
-  let resp = await callGen(model);
-
-  // If model went missing or doesn't support method, refresh and retry once
-  if (!resp.ok && resp.status === 404) {
-    console.error("Gemini 404 for model:", model, "— refreshing model catalog and retrying once");
-    CACHED_GEMINI_MODEL = null;
-    const fallbackModel = await resolveGeminiModel(apiKey);
-    if (fallbackModel !== model) {
-      resp = await callGen(fallbackModel);
+      }),
     }
-  }
+  );
+};
 
+let resp = await callGen(model);
+
+// If model went missing or doesn't support method, refresh and retry once
+if (!resp.ok && resp.status === 404) {
+  console.error("Gemini 404 for model:", model, "— refreshing model catalog and retrying once");
+  CACHED_GEMINI_MODEL = null;
+  const fallbackModel = await resolveGeminiModel(apiKey);
+  if (fallbackModel !== model) {
+    resp = await callGen(fallbackModel);
+  }
+}
+ 
   // Handle non-200 early
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => "");
@@ -297,14 +285,12 @@ ${cleaned.map((task, i) => `${i + 1}. ${task}`).join("\n")}
     } else {
       const text = (part?.text ?? "").trim().replace(/```json|```/g, "");
       
-      // Extract JSON from surrounding text:
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      const jsonText = jsonMatch ? jsonMatch[0] : text;
+      // Add this line to extract JSON from surrounding text:
+const jsonMatch = text.match(/\[[\s\S]*\]/);
      
-      arr = jsonText ? JSON.parse(jsonText) : [];
+      arr = text ? JSON.parse(text) : [];
     }
   } catch {
-    console.error("Failed to parse JSON response:", part?.text);
     arr = [];
   }
 
