@@ -4,26 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
 interface TaskInputProps {
-  onAddTask: (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
+  onAddTask: (input: string) => void;
 }
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [value, setValue] = useState('');
 
-  const addOne = useCallback((title: string) => {
-    const t = title.trim();
-    if (!t) return;
-    // Default to 30 minutes and today
-    onAddTask(t, 30, 'today');
-  }, [onAddTask]);
-
   const handleSubmit = useCallback(() => {
-    // split by newlines; keep each line as its own task
-    const lines = value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (lines.length === 0) return;
-    lines.forEach(addOne);
+    if (!value.trim()) return;
+    onAddTask(value.trim());
     setValue('');
-  }, [value, addOne]);
+  }, [value, onAddTask]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // Submit on ⌘/Ctrl+Enter
