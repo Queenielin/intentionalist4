@@ -1,4 +1,4 @@
-import { Task } from '@/types/task';
+import { Task, CATEGORY_TO_BUCKET, type WorkBucket } from '@/types/task';
 import TaskCard from './TaskCard';
 import { Card } from '@/components/ui/card';
 
@@ -9,15 +9,31 @@ interface TaskListProps {
   onCompleteTask: (taskId: string) => void;
 }
 
-export default function TaskList({ tasks, onUpdateTask, onDeleteTask, onCompleteTask }: TaskListProps) {
-  // Sort tasks by work type priority (deep -> light -> admin) and completion status
+export default function TaskList({
+  tasks,
+  onUpdateTask,
+  onDeleteTask,
+  onCompleteTask,
+}: TaskListProps) {
+  // Priority for buckets (derived from category)
+  const bucketPriority: Record<WorkBucket, number> = { deep: 0, light: 1, admin: 2 };
+
   const sortedTasks = [...tasks].sort((a, b) => {
-    if (a.completed !== b.completed) {
-      return a.completed ? 1 : -1;
+    // 1) incomplete before complete
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+
+    // 2) bucket priority (derived from category)
+    const aBucket = CATEGORY_TO_BUCKET[a.category];
+    const bBucket = CATEGORY_TO_BUCKET[b.category];
+    if (aBucket !== bBucket) {
+      return bucketPriority[aBucket] - bucketPriority[bBucket];
     }
-    
-    const workTypePriority = { deep: 0, light: 1, admin: 2 };
-    return workTypePriority[a.workType] - workTypePriority[b.workType];
+
+    // 3) optionally: shorter tasks first within same bucket
+    if (a.duration !== b.duration) return a.duration - b.duration;
+
+    // 4) finally stable by title
+    return a.title.localeCompare(b.title);
   });
 
   if (tasks.length === 0) {
@@ -34,9 +50,9 @@ export default function TaskList({ tasks, onUpdateTask, onDeleteTask, onComplete
   return (
     <div className="space-y-3">
       <h3 className="text-lg font-semibold text-foreground mb-4">
-        Today's Tasks ({tasks.filter(t => !t.completed).length} remaining)
+        Today&apos;s Tasks ({tasks.filter((t) => !t.completed).length} remaining)
       </h3>
-      
+
       {sortedTasks.map((task) => (
         <TaskCard
           key={task.id}
