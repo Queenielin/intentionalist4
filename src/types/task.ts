@@ -30,7 +30,62 @@ export const CATEGORY_TO_BUCKET: Record<Category8, WorkBucket> = {
   "Logistics & Maintenance": "admin",
 };
 
+// ─────────────────────────────────────────────────────────────
+// A Slot = what you display with TaskGroupCard (container card)
+// ─────────────────────────────────────────────────────────────
+export interface Slot {
+  id: string;
+  title: string;          // e.g., "Strategy Slot 1"
+  category: Category8;    // which column it appears in (all child tasks must match)
+  taskIds: string[];      // tasks inside this slot
+  duration?: 15 | 30 | 60; // optional "default" for slot; tasks still have their own durations
+  isExpanded?: boolean;   // UI expand/collapse
+  scheduledDay?: "today" | "tomorrow";
+  priority?: number;      // order among slots in same column
+  isPriority?: boolean;   // visual priority badge
+  createdAt: Date;
+  completed?: boolean;    // mark whole slot as done (optional)
+}
 
+// ─────────────────────────────────────────────────────────────
+// A Task = a single item that belongs to exactly one Slot
+// ─────────────────────────────────────────────────────────────
+export interface Task {
+  id: string;
+  title: string;
+  category: Category8;       // MUST match its slot.category
+  duration: 15 | 30 | 60;    // minutes
+  completed: boolean;
+
+  // Link to the container slot (replaces groupId/isGrouped)
+  slotId: string;
+
+  // Optional UI metadata
+  scheduledDay?: "today" | "tomorrow";
+  priority?: number;
+  isPriority?: boolean;
+  createdAt: Date;
+
+  // Optional while AI is running
+  isCategorizing?: boolean;
+  // Optional: keep if you show a raw label from AI separate from category
+  taskType?: string;
+}
+
+// ─────────────────────────────────────────────────────────────
+// (Optional) If you have a calendar/time grid elsewhere, keep this.
+// It’s independent from "Slot" (Slot = container card in the category column).
+// ─────────────────────────────────────────────────────────────
+export interface TimeSlot {
+  id: string;
+  time: string;            // display label
+  hour: number;
+  minute: 0 | 30;
+  task?: Task;             // carries category now (not workType)
+  isBreak?: boolean;
+  breakType?: "exercise" | "nap" | "food" | "meeting" | "other";
+  breakLabel?: string;
+}
 // Convenience: full list you can iterate over in the UI (e.g., columns)
 export const CATEGORIES_8: Category8[] = [
   "Analytical × Strategic",
@@ -69,44 +124,42 @@ export type ParsedTaskInput = {
   duration: 15 | 30 | 60;        // provisional duration hint (can be overridden by AI)
 };
 
+// ─────────────────────────────────────────────────────────────
+// A Task = a single item that belongs to exactly one Slot
+// ─────────────────────────────────────────────────────────────
 export interface Task {
   id: string;
   title: string;
-  category: Category8;              // ⬅️ NEW, replaces workType
-  duration: 15 | 30 | 60;           // minutes
+  category: Category8;       // MUST match its slot.category
+  duration: 15 | 30 | 60;    // minutes
   completed: boolean;
-  timeSlot?: string;                // ISO string for scheduled time
-  scheduledDay?: 'today' | 'tomorrow';
-  priority?: number;                // 1 = highest priority (ordering index within its cell)
-  isPriority?: boolean;             // visual priority badge
-  createdAt: Date;
-  groupId?: string;                 // ID of the group this task belongs to
-  isGrouped?: boolean;              // Whether this task is part of a group
-  isCategorizing?: boolean;         // Whether this task is being categorized by AI
-  taskType?: string;                // AI-classified subcategory (optional)
-}
 
-export interface TaskGroup {
-  id: string;
-  title: string;
-  category: Category8;              // ⬅️ NEW, replaces workType
-  duration: 15 | 30 | 60;
-  taskIds: string[];
-  completed: boolean;
-  scheduledDay?: 'today' | 'tomorrow';
+  // Link to the container slot (replaces groupId/isGrouped)
+  slotId: string;
+
+  // Optional UI metadata
+  scheduledDay?: "today" | "tomorrow";
   priority?: number;
   isPriority?: boolean;
   createdAt: Date;
-  isExpanded?: boolean;             // Whether the group is showing individual tasks
+
+  // Optional while AI is running
+  isCategorizing?: boolean;
+  // Optional: keep if you show a raw label from AI separate from category
+  taskType?: string;
 }
 
+// ─────────────────────────────────────────────────────────────
+// (Optional) If you have a calendar/time grid elsewhere, keep this.
+// It’s independent from "Slot" (Slot = container card in the category column).
+// ─────────────────────────────────────────────────────────────
 export interface TimeSlot {
   id: string;
-  time: string;
+  time: string;            // display label
   hour: number;
   minute: 0 | 30;
-  task?: Task;                       // ⬅️ Will now carry category instead of workType
+  task?: Task;             // carries category now (not workType)
   isBreak?: boolean;
-  breakType?: 'exercise' | 'nap' | 'food' | 'meeting' | 'other';
+  breakType?: "exercise" | "nap" | "food" | "meeting" | "other";
   breakLabel?: string;
 }
