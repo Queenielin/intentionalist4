@@ -1,120 +1,115 @@
-import { Task, Slot, Category8 } from '@/types/task';
+import { Task, Slot, Category8 } from "@/types/task";
 
 // ─────────────────────────────────────────────────────────────
-// Config
+// Rules
 // ─────────────────────────────────────────────────────────────
-
-// Max *total* minutes of tasks inside a Slot (your 1-hour per slot rule)
-const MAX_SLOT_TOTAL_MINUTES = 60;
-
-// Optional similarity threshold if you want to auto-cluster within the same category
+const MAX_SLOT_MINUTES = 75; // 1h + 15m
 const SIMILARITY_THRESHOLD = 0.6;
 
 // ─────────────────────────────────────────────────────────────
-// Public APIs (renamed to Slot semantics)
+// Public API
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Given a flat list of tasks (same day, or however you filter),
- * create Slots by grouping similar tasks *within the same category*
- * while ensuring each Slot’s total duration ≤ 60 minutes.
+ * Build Slots from a flat list of tasks with these constraints:
+ * - Tasks in the same Slot must share the same category.
+ * - Slot total minutes <= 75.
+ * - Solo 60m tasks are put first. If there's a spare 15m, we pair
+ *   exactly one 15m with one 60m in the same category to make 75m.
+ * - Small tasks (15/30) are clustered by title similarity and packed.
  */
 export function createSlots(tasks: Task[]): { slots: Slot[]; unassignedTasks: Task[] } {
-  const slots: Slot[] = [];
-  const unassignedTasks: Task[] = [];
-  const processed = new Set<string>();
+  const active = tasks.filter((t) => !t.completed);
+  const byCat = groupBy(active, (t) => t.category);
 
-  // Only consider active, uncategorized-to-slot tasks; you can prefilter by day if needed upstream
-  const candidates = tasks.filter(t => !t.completed);
+  const allSlots: Slot[] = [];
+  const unassigned: Task[] = [];
 
-  for (const task of candidates) {
-    if (processed.has(task.id)) continue;
+  for (const [category, list] of Object.entries(byCat) as [Category8, Task[]][]) {
+    // Split by duration class
+    const sixty = list.filter((t) => t.duration === 60);
+    const thirty = list.filter((t) => t.duration === 30);
+    const fifteen = list.filter((t) => t.duration === 15);
 
-    // Try to place this task into an existing compatible Slot first
-    const compatible = slots.find(s => canAddTaskToSlot(s, task));
-    if (compatible) {
-      const updated = addTaskToSlot(compatible, task);
-      // replace slot in array
-      const idx = slots.findIndex(s => s.id === compatible.id);
-      slots[idx] = updated;
-      processed.add(task.id);
-      continue;
-    }
-
-    // Otherwise, try to find similar tasks (same category) to start a new Slot
-    const similar = candidates.filter(t =>
-      !processed.has(t.id) &&
-      t.id !== task.id &&
-      t.category === task.category &&
-      areTitlesSimilar(task.title, t.title)
+    // 1) Create solo 60m slots first
+    const sixtySlots = sixty.map((t) =>
+      makeSlot(category, [t], `${category}-60solo-${t.id}`)
     );
 
-    // Build a Slot with as many similar tasks as fit under 60 min
-    const picked: Task[] = [task];
-    let total = task.duration;
-
-    for (const t of similar) {
-      if (total + t.duration <= MAX_SLOT_TOTAL_MINUTES) {
-        picked.push(t);
-        total += t.duration;
+    // 2) Try to pair one 15m with one 60m (same category) if we have leftovers
+    //    to avoid a dangling single 15m slot.
+    const paired = new Set<string>(); // task ids we’ve consumed from fifteen[]
+    const sixtyToAugment = [...sixtySlots]; // copy to mutate
+    let fi = 0;
+    for (let i = 0; i < sixtyToAugment.length && fi < fifteen.length; i++) {
+      const slot = sixtyToAugment[i];
+      const f = fifteen[fi];
+      if (!f) break;
+      // if we can add 15m to this 60m slot → do it once
+      if (sumDuration([f]) + slotDuration(slot, tasks) <= MAX_SLOT_MINUTES) {
+        slot.taskIds.push(f.id);
+        slot.title = bumpCountInTitle(slot.title, slot.taskIds.length) ?? slot.title;
+        paired.add(f.id);
+        fi++;
       }
     }
 
-    // Create the Slot
-    const slot: Slot = {
-      id: `slot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      title: generateSlotTitle(task.category, picked),
-      category: task.category,
-      taskIds: picked.map(t => t.id),
-      // optional metadata
-      createdAt: new Date(),
-      isExpanded: true,
-    };
+    // Filter out paired 15s from the remaining small tasks
+    const remaining15 = fifteen.filter((t) => !paired.has(t.id));
 
-    slots.push(slot);
-    picked.forEach(t => processed.add(t.id));
+    // 3) Cluster remaining 15/30 by title similarity and pack into 75m slots
+    const small = [...thirty, ...remaining15];
+    const smallClusters = clusterBySimilarity(small);
+    const smallSlots: Slot[] = [];
+    for (const cluster of smallClusters) {
+      const packed = packIntoSlots(cluster, MAX_SLOT_MINUTES);
+      packed.forEach((tasksInSlot, idx) => {
+        // keep related clusters close with a stable id stem
+        smallSlots.push(
+          makeSlot(category, tasksInSlot, `${category}-small-${cluster.key}-${idx}`)
+        );
+      });
+    }
+
+    // Order within category:
+    //   A) 60m solos (and any 60+15) first
+    //   B) then cluster-based small slots
+    allSlots.push(...sixtyToAugment, ...smallSlots);
   }
 
-  // Anything not processed is unassigned
-  for (const t of candidates) {
-    if (!processed.has(t.id)) unassignedTasks.push(t);
-  }
-
-  return { slots, unassignedTasks };
+  // Anything completed or filtered out would be "unassigned" (none in this flow),
+  // but we keep the return shape.
+  return { slots: allSlots, unassignedTasks: unassigned };
 }
 
-/** Check if a task can be added to a slot:
- *  - Same category
- *  - New total duration ≤ 60
- */
-export function canAddTaskToSlot(slot: Slot, task: Task): boolean {
+/** Can a task be added to a Slot (same category + total <= 75m)? */
+export function canAddTaskToSlot(slot: Slot, task: Task, allTasks: Task[]): boolean {
   if (task.category !== slot.category) return false;
-  const currentTotal = slotTotalMinutes(slot, task);
-  return currentTotal + task.duration <= MAX_SLOT_TOTAL_MINUTES;
+  const total = slotDuration(slot, allTasks) + task.duration;
+  return total <= MAX_SLOT_MINUTES;
 }
 
-/** Return a new Slot with the task added (throws if not allowed). */
-export function addTaskToSlot(slot: Slot, task: Task): Slot {
-  if (!canAddTaskToSlot(slot, task)) {
-    throw new Error('Cannot add task to slot: category mismatch or duration cap (60m) exceeded.');
+/** Add task to Slot (throws if not allowed). */
+export function addTaskToSlot(slot: Slot, task: Task, allTasks: Task[]): Slot {
+  if (!canAddTaskToSlot(slot, task, allTasks)) {
+    throw new Error("Cannot add task to slot: category mismatch or >75m total.");
   }
-  const newTaskIds = [...slot.taskIds, task.id];
+  const nextTaskIds = [...slot.taskIds, task.id];
   return {
     ...slot,
-    taskIds: newTaskIds,
-    title: bumpCountInTitle(slot.title, newTaskIds.length) ?? generateSlotTitle(slot.category, newTaskIds.map(id => ({ id } as Task))),
+    taskIds: nextTaskIds,
+    title: bumpCountInTitle(slot.title, nextTaskIds.length) ?? slot.title,
   };
 }
 
-/** Remove a task from a slot. If removing drops to 0 tasks, return null to signal deletion. */
+/** Remove task from Slot. If none left, return null to signal deletion. */
 export function removeTaskFromSlot(slot: Slot, taskId: string): Slot | null {
-  const newIds = slot.taskIds.filter(id => id !== taskId);
-  if (newIds.length === 0) return null;
-
+  const next = slot.taskIds.filter((id) => id !== taskId);
+  if (next.length === 0) return null;
   return {
     ...slot,
-    taskIds: newIds,
-    title: bumpCountInTitle(slot.title, newIds.length) ?? slot.title,
+    taskIds: next,
+    title: bumpCountInTitle(slot.title, next.length) ?? slot.title,
   };
 }
 
@@ -122,91 +117,132 @@ export function removeTaskFromSlot(slot: Slot, taskId: string): Slot | null {
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-function slotTotalMinutes(slot: Slot, lookupTask?: Task): number {
-  // We don’t have tasks here; callers usually have them.
-  // For safety, if you want an exact sum, pass the task you’re adding,
-  // otherwise assume each existing task contributes (unknown) minutes.
-  // In real usage, compute using your task store:
-  //  sum(tasks.filter(t => slot.taskIds.includes(t.id)).map(t => t.duration))
-  // For this file to stay pure, we just count the known new task + assume 0 for existing.
-  // Better approach: move this logic to where you have access to the tasks array.
-  return 0 + (lookupTask ? 0 : 0);
+function groupBy<T, K extends string | number>(
+  arr: T[],
+  keyer: (t: T) => K
+): Record<K, T[]> {
+  return arr.reduce((acc, item) => {
+    const k = keyer(item);
+    (acc[k] ||= []).push(item);
+    return acc;
+  }, {} as Record<K, T[]>);
 }
 
-/** Title heuristics, loosened: we only care if they feel alike. */
-function areTitlesSimilar(a: string, b: string): boolean {
-  const t1 = a.toLowerCase();
-  const t2 = b.toLowerCase();
-
-  // fast paths for common types
-  if (isEmailTask(t1) && isEmailTask(t2)) return true;
-  if (isSocialTask(t1) && isSocialTask(t2)) return true;
-  if (isAdminTask(t1) && isAdminTask(t2)) return true;
-  if (isWritingTask(t1) && isWritingTask(t2)) return true;
-  if (isMeetingTask(t1) && isMeetingTask(t2)) return true;
-  if (isFileTask(t1) && isFileTask(t2)) return true;
-
-  // fallback to fuzzy similarity
-  return stringSimilarity(t1, t2) >= SIMILARITY_THRESHOLD;
+function slotDuration(slot: Slot, allTasks: Task[]): number {
+  const map = new Map(allTasks.map((t) => [t.id, t]));
+  return slot.taskIds.reduce((sum, id) => sum + (map.get(id)?.duration ?? 0), 0);
 }
 
-function isEmailTask(t: string)       { return /(reply|respond|email|inbox|message)/i.test(t); }
-function isSocialTask(t: string)      { return /(linkedin|facebook|twitter|x\.com|instagram|social|post|comment)/i.test(t); }
-function isAdminTask(t: string)       { return /(invoice|expense|form|paperwork|file|organize|schedule|calendar|booking)/i.test(t); }
-function isWritingTask(t: string)     { return /(write|draft|compose|blog|article|content)/i.test(t); }
-function isMeetingTask(t: string)     { return /(meeting|call|discuss|sync|standup|interview)/i.test(t); }
-function isFileTask(t: string)        { return /(organize|sort|clean|backup|upload|download|file|folder)/i.test(t); }
+function sumDuration(list: Task[]): number {
+  return list.reduce((s, t) => s + t.duration, 0);
+}
 
-/** Simple normalized Levenshtein similarity */
-function stringSimilarity(a: string, b: string): number {
-  const longer = a.length >= b.length ? a : b;
-  const shorter = a.length >= b.length ? b : a;
+function normalizeTitle(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function similarity(a: string, b: string): number {
+  const A = normalizeTitle(a);
+  const B = normalizeTitle(b);
+  if (A === B) return 1;
+
+  const longer = A.length >= B.length ? A : B;
+  const shorter = A.length >= B.length ? B : A;
   if (longer.length === 0) return 1;
-  const dist = levenshtein(longer, shorter);
+
+  // Levenshtein
+  const dist = (() => {
+    const m = Array.from({ length: shorter.length + 1 }, () =>
+      Array<number>(longer.length + 1).fill(0)
+    );
+    for (let i = 0; i <= longer.length; i++) m[0][i] = i;
+    for (let j = 0; j <= shorter.length; j++) m[j][0] = j;
+    for (let j = 1; j <= shorter.length; j++) {
+      for (let i = 1; i <= longer.length; i++) {
+        if (longer[i - 1] === shorter[j - 1]) m[j][i] = m[j - 1][i - 1];
+        else m[j][i] = Math.min(m[j - 1][i - 1] + 1, m[j][i - 1] + 1, m[j - 1][i] + 1);
+      }
+    }
+    return m[shorter.length][longer.length];
+  })();
+
   return (longer.length - dist) / longer.length;
 }
 
-function levenshtein(a: string, b: string): number {
-  const matrix = Array.from({ length: b.length + 1 }, () =>
-    Array<number>(a.length + 1).fill(0)
-  );
-  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+/** Cluster by (normalized) seed title; only same-category tasks are passed in. */
+function clusterBySimilarity(tasks: Task[]): Array<{ key: string; tasks: Task[] }> {
+  const remaining = [...tasks];
+  const clusters: Array<{ key: string; tasks: Task[] }> = [];
 
-  for (let j = 1; j <= b.length; j++) {
-    for (let i = 1; i <= a.length; i++) {
-      if (a[i - 1] === b[j - 1]) matrix[j][i] = matrix[j - 1][i - 1];
-      else {
-        matrix[j][i] = Math.min(
-          matrix[j - 1][i - 1] + 1,
-          matrix[j][i - 1] + 1,
-          matrix[j - 1][i] + 1
-        );
+  while (remaining.length) {
+    const seed = remaining.shift()!;
+    const key = normalizeTitle(seed.title) || `misc-${seed.id}`;
+
+    const bucket: Task[] = [seed];
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      const t = remaining[i];
+      if (similarity(seed.title, t.title) >= SIMILARITY_THRESHOLD) {
+        bucket.push(t);
+        remaining.splice(i, 1);
       }
     }
+    clusters.push({ key, tasks: bucket });
   }
-  return matrix[b.length][a.length];
+  return clusters;
 }
 
-/** Title like "Email (3)" / "Social media (2)" / "Similar tasks (n)" */
-function generateSlotTitle(category: Category8, tasksInSlot: Task[]): string {
+/** Greedy pack into bins with capacity cap (75m). */
+function packIntoSlots(items: Task[], cap: number): Task[][] {
+  const slots: Task[][] = [];
+  const sorted = [...items].sort((a, b) => b.duration - a.duration); // 30s before 15s
+
+  for (const t of sorted) {
+    let placed = false;
+    for (const s of slots) {
+      const total = sumDuration(s);
+      if (total + t.duration <= cap) {
+        s.push(t);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) slots.push([t]);
+  }
+  return slots;
+}
+
+/** Build a Slot with a reasonable title. */
+function makeSlot(category: Category8, tasksInSlot: Task[], idSeed: string): Slot {
   const count = tasksInSlot.length;
-  // Prefer a semantic label if all tasks match a heuristic family
-  if (tasksInSlot.every(t => isEmailTask(t.title))) return `Email (${count})`;
-  if (tasksInSlot.every(t => isSocialTask(t.title))) return `Social media (${count})`;
-  if (tasksInSlot.every(t => isAdminTask(t.title)))  return `Admin (${count})`;
-  if (tasksInSlot.every(t => isWritingTask(t.title))) return `Writing (${count})`;
-  if (tasksInSlot.every(t => isMeetingTask(t.title))) return `Meetings (${count})`;
-  if (tasksInSlot.every(t => isFileTask(t.title)))    return `File mgmt (${count})`;
+  const allTitles = tasksInSlot.map((t) => normalizeTitle(t.title));
+  const allSameEmail = allTitles.every((t) => /(reply|respond|email|inbox|message)/.test(t));
+  const allSameSocial = allTitles.every((t) => /(linkedin|facebook|x|twitter|instagram|social|post|comment)/.test(t));
+  const allAdmin = allTitles.every((t) => /(invoice|expense|form|paperwork|file|organize|schedule|calendar|booking)/.test(t));
+  const allWrite = allTitles.every((t) => /(write|draft|compose|blog|article|content)/.test(t));
+  const allMeet = allTitles.every((t) => /(meeting|call|discuss|sync|standup|interview)/.test(t));
+  const allFile = allTitles.every((t) => /(organize|sort|clean|backup|upload|download|file|folder)/.test(t));
 
-  // Fallback: category-based
-  return `${category} (${count})`;
+  let label =
+    (allSameEmail && "Email") ||
+    (allSameSocial && "Social media") ||
+    (allAdmin && "Admin") ||
+    (allWrite && "Writing") ||
+    (allMeet && "Meetings") ||
+    (allFile && "File mgmt") ||
+    category;
+
+  return {
+    id: `slot-${idSeed}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    title: `${label} (${count})`,
+    category,
+    taskIds: tasksInSlot.map((t) => t.id),
+    createdAt: new Date(),
+    isExpanded: true,
+  };
 }
 
-/** Update trailing "(n)" count if present; else return null to signal caller to regenerate. */
-function bumpCountInTitle(title: string, newCount: number): string | null {
-  if (/\(\d+\)$/.test(title)) {
-    return title.replace(/\(\d+\)$/, `(${newCount})`);
-  }
+/** Update trailing "(n)" if present. */
+function bumpCountInTitle(title: string, n: number): string | null {
+  if (/\(\d+\)$/.test(title)) return title.replace(/\(\d+\)$/, `(${n})`);
   return null;
 }
