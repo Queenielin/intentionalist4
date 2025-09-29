@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Grip, Clock, CheckCircle2, Edit3, Trash2 } from 'lucide-react';
+import { Grip, Clock, CircleCheck as CheckCircle2, CreditCard as Edit3, Trash2 } from 'lucide-react';
 import { Task, Category8, CATEGORY_TO_BUCKET, WorkBucket } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
