@@ -196,7 +196,6 @@ async function classifyTasks(tasks: string[], apiKey: string) {
   const pre = tasks.map(extractTimeHint);
   const cleaned = pre.map((p) => p.title);
 
-
   const prompt = `You are an advanced task classifier using cognitive science principles.
 Classify each task into ONE of these 8 categories, then assign a duration (15, 30, 60).
 
