@@ -7,15 +7,18 @@ import WorkloadSummary from '@/components/WorkloadSummary';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, List } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Index() {
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const handleAddTask = useCallback((title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
-    const newTask: Task = {
+  const handleAddTask = useCallback(async (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+    // Create temporary task with loading state
+    const tempTask: Task = {
       id: crypto.randomUUID(),
       title,
-      category: 'Clerical & Admin Routines' as Category8, // Default category until AI categorizes
+      category: 'Social & Relational' as Category8, // Temporary category
       duration,
       completed: false,
       slotId: 'default-slot',
@@ -24,7 +27,61 @@ export default function Index() {
       isCategorizing: true, // Show loading state while AI processes
     };
 
-    setTasks(prev => [...prev, newTask]);
+    setTasks(prev => [...prev, tempTask]);
+
+    try {
+      // Call the edge function to categorize the task
+      const { data, error } = await supabase.functions.invoke('categorize-tasks', {
+        body: { tasks: [title] }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error('Failed to categorize task');
+        // Remove loading state but keep task with default category
+        setTasks(prev => prev.map(t => 
+          t.id === tempTask.id 
+            ? { ...t, isCategorizing: false }
+            : t
+        ));
+        return;
+      }
+
+      if (data?.classifications?.[0]) {
+        const classification = data.classifications[0];
+        console.log('Task classified:', classification);
+        
+        // Update task with AI classification
+        setTasks(prev => prev.map(t => 
+          t.id === tempTask.id 
+            ? { 
+                ...t, 
+                title: classification.title || title,
+                category: classification.category as Category8,
+                duration: classification.duration,
+                isCategorizing: false 
+              }
+            : t
+        ));
+
+        toast.success(`Task categorized as "${classification.category}"`);
+      } else {
+        console.error('No classification returned');
+        setTasks(prev => prev.map(t => 
+          t.id === tempTask.id 
+            ? { ...t, isCategorizing: false }
+            : t
+        ));
+      }
+    } catch (err) {
+      console.error('Failed to categorize task:', err);
+      toast.error('Failed to categorize task');
+      setTasks(prev => prev.map(t => 
+        t.id === tempTask.id 
+          ? { ...t, isCategorizing: false }
+          : t
+      ));
+    }
   }, []);
 
   const handleUpdateTask = useCallback((taskId: string, updates: Partial<Task>) => {
