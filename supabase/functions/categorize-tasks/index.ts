@@ -155,9 +155,11 @@ async function classifyTasks(tasks: string[], apiKey: string) {
   const cleaned = pre.map((p) => p.title);
 
 
-  const prompt = `You are an advanced task classifier using cognitive science principles.
+const prompt = `You are an advanced task classifier using cognitive science principles.
 Classify each task into ONE of these 8 categories, then assign a duration (15, 30, 60).
-Return ONLY a JSON array of objects (no prose, no code fences).
+
+CRITICAL: Your response must be ONLY valid JSON - no explanations, no markdown, no code fences.
+Start with [ and end with ]. Nothing else.
 
 CATEGORIES (cognitive definitions):
 1. "Analytical × Strategic" = structured reasoning, trade-offs, modeling, scenario planning, debugging.
@@ -225,6 +227,10 @@ const resp = await fetch(
       arr = part.json;
     } else {
       const text = (part?.text ?? "").trim().replace(/```json|```/g, "");
+      
+      // Add this line to extract JSON from surrounding text:
+const jsonMatch = text.match(/\[[\s\S]*\]/);
+     
       arr = text ? JSON.parse(text) : [];
     }
   } catch {
