@@ -7,6 +7,25 @@ import { breakDownTasks } from '@/utils/taskAI';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+// Map Gemini category to app WorkType
+const categoryToWorkType = (category: string): 'deep' | 'light' | 'admin' => {
+  switch (category) {
+    case 'Analytical × Strategic':
+    case 'Creative × Generative':
+    case 'Learning × Absorptive':
+    case 'Constructive × Building':
+      return 'deep';
+    case 'Social & Relational':
+    case 'Critical & Structuring':
+      return 'light';
+    case 'Clerical & Admin Routines':
+    case 'Logistics & Maintenance':
+      return 'admin';
+    default:
+      return 'light';
+  }
+};
+
 interface TaskInputProps {
   onAddTask: (title: string, workType: 'deep' | 'light' | 'admin', duration: 15 | 30 | 60, isCategorizing?: boolean, tempId?: string, taskType?: string) => void;
 }
@@ -64,28 +83,38 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
                 const chunk = decoder.decode(value);
                 const lines = chunk.split('\n');
                 
-                for (const line of lines) {
-                  if (line.startsWith('data: ')) {
-                    const data = JSON.parse(line.slice(6));
-                    const { index, classification } = data;
-                    
-                    // Update the specific task with AI classification
-                    onAddTask(
-                      taskTitles[index], 
-                      classification.workType, 
-                      classification.duration, 
-                      false, // Remove categorizing flag
-                      tempTaskIds[index], // Use temp ID to update existing task
-                      classification.taskType
-                    );
+for (const rawLine of lines) {
+  const line = rawLine.trim();
+  if (line.startsWith('data:')) {
+    const payload = line.slice(5).trim(); // after 'data:'
+    if (payload === 'done') continue; // ignore end signal
+    if (!payload.startsWith('{')) continue; // skip non-JSON payloads
+    try {
+      const data = JSON.parse(payload);
+      const { index, classification } = data as any;
+      const taskType = (classification?.category ?? classification?.taskType) as string;
+      const workType = categoryToWorkType(taskType);
 
-                    toast({
-                      title: "Task updated",
-                      description: `"${taskTitles[index]}" → ${classification.taskType}`,
-                      duration: 1500
-                    });
-                  }
-                }
+      // Update the specific task with AI classification
+      onAddTask(
+        taskTitles[index],
+        workType,
+        classification.duration,
+        false, // Remove categorizing flag
+        tempTaskIds[index], // Use temp ID to update existing task
+        taskType
+      );
+
+      toast({
+        title: "Task updated",
+        description: `"${taskTitles[index]}" → ${taskType}`,
+        duration: 1500
+      });
+    } catch (_e) {
+      // Ignore malformed line (e.g., partial chunks)
+    }
+  }
+}
               }
               return;
             }
@@ -110,14 +139,14 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
           // Update each task with AI classification
           tempTaskIds.forEach((tempId, index) => {
             const classification = classifications[index];
-            onAddTask(
-              taskTitles[index], 
-              classification.workType, 
-              classification.duration, 
-              false, 
-              tempId,
-              classification.taskType
-            );
+onAddTask(
+  taskTitles[index], 
+  categoryToWorkType(classification.category), 
+  classification.duration, 
+  false, 
+  tempId,
+  classification.category
+);
           });
         }
         
