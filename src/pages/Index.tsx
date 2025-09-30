@@ -9,6 +9,7 @@ import CommitmentPanel from '../components/CommitmentPanel';
 import { Button } from '../components/ui/button';
 import { Calendar, List } from 'lucide-react';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -21,7 +22,69 @@ const Index = () => {
     nutrition: 2,
   });
 
-  // ... your addTask / updateTask / delete / complete / duplicate unchanged ...
+  const addTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const newTask: Task = {
+        id: uuidv4(),
+        ...taskData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // If no category is provided, use AI to categorize
+      if (!newTask.category) {
+        try {
+          const response = await supabase.functions.invoke('categorize-tasks', {
+            body: { tasks: [{ title: newTask.title, description: newTask.description }] }
+          });
+          
+          if (response.data?.categorizedTasks?.[0]?.category) {
+            newTask.category = response.data.categorizedTasks[0].category;
+          }
+        } catch (error) {
+          console.warn('Failed to categorize task:', error);
+          // Continue with default category if AI fails
+        }
+      }
+
+      setTasks(prev => [...prev, newTask]);
+      toast.success('Task added successfully');
+    } catch (error) {
+      console.error('Error adding task:', error);
+      toast.error('Failed to add task');
+    }
+  };
+
+  const updateTask = (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId 
+        ? { ...task, ...updates, updated_at: new Date().toISOString() }
+        : task
+    ));
+  };
+
+  const deleteTask = (taskId: string) => {
+    setTasks(prev => prev.filter(task => task.id !== taskId));
+    toast.success('Task deleted');
+  };
+
+  const completeTask = (taskId: string) => {
+    updateTask(taskId, { completed: true });
+    toast.success('Task completed');
+  };
+
+  const duplicateTask = (task: Task) => {
+    const duplicatedTask: Task = {
+      ...task,
+      id: uuidv4(),
+      title: `${task.title} (Copy)`,
+      completed: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setTasks(prev => [...prev, duplicatedTask]);
+    toast.success('Task duplicated');
+  };
 
   return (
     <div className="flex h-screen bg-gray-50">
