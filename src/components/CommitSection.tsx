@@ -1,5 +1,10 @@
-import React from 'react';
+ import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 
 interface Commitments {
   focusTime: number;
@@ -17,65 +22,121 @@ interface CommitSectionProps {
   ) => void;
 }
 
-/** Generic segmented clickable bar (squares) */
+function tipFocus(endVal: number) {
+  if (endVal >= 5.5) return '≥5.5h: fatigue risk; quality tends to drop after prolonged focus.';
+  if (endVal >= 5.0) return '≈5h: near upper bound for most; plan breaks and recovery.';
+  if (endVal >= 4.0) return '3–4h: sweet spot for sustained deep work for many.';
+  if (endVal >= 2.0) return '2–3h: solid daily focus block; protect from interruptions.';
+  return 'Build momentum with shorter blocks; aim toward 2–4h on key days.';
+}
+
+function tipSleep(endVal: number) {
+  if (endVal >= 7 && endVal <= 9) return '7–9h supports memory, mood, reaction time, and long-term health.';
+  if (endVal === 6.5) return '6.5h: borderline—many see dips in attention and impulse control.';
+  if (endVal <= 6) return '≤6h: higher risk of cognitive impairment and errors; extend if possible.';
+  return 'Approaching the 7–9h range improves recovery and learning.';
+}
+
+function tipNutrition(endVal: number) {
+  if (endVal >= 1 && endVal <= 3) return '1–3h relaxed meals aid energy stability and reduce decision fatigue.';
+  if (endVal === 1.0) return '≈1h: minimal mealtime—prioritize protein/fiber to avoid crashes.';
+  if (endVal === 0.5) return '0.5h: rushed meals can worsen glycemic swings; add time if possible.';
+  return 'Mindful, unhurried meals tend to support steadier energy.';
+}
+
+function tipMovement(endVal: number) {
+  if (endVal === 0.5) return 'Even 30 minutes boosts mood and alertness—great start.';
+  if (endVal >= 1 && endVal <= 4) return 'Regular movement supports mood, sleep, and cognition (≈150–300 min/week).';
+  return 'Higher totals can work if intensity is moderate and recovery adequate.';
+}
+
+function tipDowntime(endVal: number) {
+  if (endVal >= 1 && endVal <= 2) return '1–2h daily downtime helps stress offloading and sustained motivation.';
+  if (endVal === 0.5) return 'Minimal downtime—brief decompression reduces stress carryover.';
+  if (endVal > 2.5) return 'Extended downtime can restore well-being if it fits your day.';
+  return 'Consistent recovery protects sleep and focus quality.';
+}
+
+
 function SegmentedCommitBar({
   title,
   subtitle,
   value,
+  highlightValue,          // keeps your per-bar highlight logic
+  labelsEnabled = true,
   onChange,
-  segments = 10,
+  segments,
   step = 0.5,
+  start = 0,
   colorForIndex,
   showLabelAtIndex,
   lightDividerAt,
+  disabled = false,
+  tipForEndVal,            // ✅ NEW/RESTORED: per-square tooltip content
 }: {
-  title: string;
+  title?: string;
   subtitle?: string;
   value: number;
+  highlightValue?: number | null;
+  labelsEnabled?: boolean;
   onChange: (h: number) => void;
-  segments?: number;
+  segments: number;
   step?: number;
-  colorForIndex: (idx: number) => 'red' | 'orange' | 'green';
-  showLabelAtIndex?: (idx: number) => string | undefined;
-  lightDividerAt?: number; // draw a lighter divider after this index (i.e., between #lightDividerAt and #lightDividerAt+1)
+  start?: number;
+  colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green';
+  showLabelAtIndex?: (idx: number, endVal: number) => string | undefined;
+  lightDividerAt?: number;
+  disabled?: boolean;
+  tipForEndVal?: (endVal: number) => string;  // ✅
 }) {
-  const selectedIdx = Math.max(-1, Math.round(value / step) - 1); // -1 means nothing selected
+  const basis = highlightValue ?? value;
+  const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
 
   return (
-    <div className="mb-4">
-      <h3 className="text-sm font-medium text-gray-700 mb-2">
-        {title} {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
-      </h3>
+    <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
+      {title ? (
+        <h3 className="text-sm font-medium text-gray-700 mb-2">
+          {title} {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
+        </h3>
+      ) : null}
 
       <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
         {Array.from({ length: segments }).map((_, idx) => {
-          const h = (idx + 1) * step;                   // hours represented by this square
-          const tone = colorForIndex(idx);              // red | orange | green
+          const endVal = start + (idx + 1) * step;
+          const tone = colorForIndex(idx, endVal);
           const active = idx <= selectedIdx;
 
-          const bg = tone === 'red'
-            ? (active ? 'bg-red-500'    : 'bg-red-100')
+          const bg =
+            tone === 'red'
+              ? active ? 'bg-red-500' : 'bg-red-100'
+              : tone === 'orange'
+              ? active ? 'bg-orange-500' : 'bg-orange-100'
+              : active ? 'bg-green-600' : 'bg-green-100';
+
+          const fg = active
+            ? 'text-white'
+            : tone === 'red'
+            ? 'text-red-700'
             : tone === 'orange'
-            ? (active ? 'bg-orange-500' : 'bg-orange-100')
-            : (active ? 'bg-green-600'  : 'bg-green-100');
+            ? 'text-orange-700'
+            : 'text-green-700';
 
-          const fg = active ? 'text-white' : (
-            tone === 'red' ? 'text-red-700' : tone === 'orange' ? 'text-orange-700' : 'text-green-700'
-          );
+          const divider =
+            idx === 0
+              ? ''
+              : idx === lightDividerAt
+              ? 'border-l border-l-gray-200'
+              : 'border-l border-l-gray-300';
 
-          // borders between squares; lighter divider at requested boundary
-          const divider = idx === 0
-            ? '' 
-            : (idx === lightDividerAt ? 'border-l border-l-gray-200' : 'border-l border-l-gray-300');
+          const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
+          const tip = tipForEndVal ? tipForEndVal(endVal) : `${endVal} hours`;
 
-          const label = showLabelAtIndex ? showLabelAtIndex(idx) : undefined;
-
-          return (
+          const Square = (
             <button
               key={idx}
               type="button"
-              onClick={() => onChange(h)}
-              title={`${h} hours`}
+              onClick={() => onChange(endVal)}
+              title={`${endVal} hours`}
               className={cn(
                 'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
                 bg, fg, divider,
@@ -86,96 +147,195 @@ function SegmentedCommitBar({
               {label ? <span className="pointer-events-none">{label}</span> : null}
             </button>
           );
+
+          return tipForEndVal ? (
+            <Tooltip key={idx}>
+              <TooltipTrigger asChild>{Square}</TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs leading-snug">
+                <div className="font-medium mb-0.5">{endVal}h</div>
+                <div>{tip}</div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            Square
+          );
         })}
       </div>
     </div>
   );
 }
 
-export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
+
+function FocusTimeMultiBars({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (h: number) => void;
+}) {
+  // Bar-specific selections (absolute end values)
+  const [bar1Val, setBar1Val] = useState<number | null>(null); // e.g., 3.0
+  const [bar2Val, setBar2Val] = useState<number | null>(null); // e.g., 4.0
+  const [bar3Val, setBar3Val] = useState<number | null>(null); // e.g., 4.5
+
+  const step = 0.5;
+  const segments = 11;
+
+  // Bar 1: 0.5 → 5.5
+  const start1 = 0.0;
+
+  // Bar 2 start depends on Bar 1 selection (no numbers before bar1 is picked)
+  const start2 = bar1Val ?? null;
+
+  // Bar 3 start depends on Bar 2 selection (no numbers before bar2 is picked)
+  const start3 = bar2Val ?? null;
+
+  // Colors:
+  // Bar 1 special thresholds
+  const colorBar1 = (_idx: number, endVal: number) => {
+    if (endVal === 5.5) return 'red';
+    if (endVal === 5.0 || endVal === 4.5) return 'orange';
+    return 'green';
+  };
+
+  // Bar 2 & 3: "only squares beyond the 9th become orange"
+  //   => squares 1..9 green, 10..11 orange
+  const colorBarN = (idx: number) => (idx >= 9 ? 'orange' : 'green');
+
+  // Labels only on full hours
+  const fullHourLabel = (_idx: number, endVal: number) =>
+    Number.isInteger(endVal) ? String(endVal) : undefined;
+
   return (
-    <div className="space-y-4">
-      {/* Focus Time: 0.5–5.0h (10 squares, 0.5h each) */}
+    <div className="space-y-2">
+      {/* Bar 1 */}
       <SegmentedCommitBar
         title="Focus Time"
         subtitle="(deep work target)"
-        value={commitments.focusTime}
-        onChange={(h) => onUpdateCommitment('focusTime', h)}
-        segments={10}
-        step={0.5}
-        // 0–1h = red (idx 0–1), 1–2h = orange (idx 2–3), ≥2h = green (idx 4–9)
-        colorForIndex={(idx) => (idx <= 1 ? 'red' : idx <= 3 ? 'orange' : 'green')}
-        // labels 1..5 on even squares (2,4,6,8,10)
-        showLabelAtIndex={(idx) => {
-          const hourAt = (idx + 1) * 0.5;
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+        value={value}                         // canonical (daily bar)
+        highlightValue={bar1Val ?? null}      // ✅ highlight by bar1 selection only
+        labelsEnabled={true}                  // labels visible
+        onChange={(h) => {
+          setBar1Val(h);
+          setBar2Val(null);
+          setBar3Val(null);
+          onChange(h);                        // total becomes bar1 value
         }}
-        lightDividerAt={1} // lighter line between first (0.5h) and second (1.0h)
+        segments={segments}
+        step={step}
+        start={start1}
+        colorForIndex={colorBar1}
+        showLabelAtIndex={fullHourLabel}
+        lightDividerAt={1}
       />
 
-      {/* Sleep: 6.0–9.0h (7 squares, 0.5h each) */}
+      {/* Bar 2 (locked until bar1 is chosen) */}
+      <SegmentedCommitBar
+        value={value}
+        highlightValue={bar2Val ?? null}      // ✅ highlight by bar2 selection only
+        labelsEnabled={start2 != null}        // ✅ show numbers only after bar1 picked
+        onChange={(h) => {
+          if (start2 == null) return;
+          setBar2Val(h);
+          setBar3Val(null);
+          onChange(h);                        // total becomes this absolute end value
+        }}
+        segments={segments}
+        step={step}
+        start={start2 ?? 0}
+        colorForIndex={(idx) => colorBarN(idx)}
+        showLabelAtIndex={fullHourLabel}
+        disabled={start2 == null}
+      />
+
+      {/* Bar 3 (locked until bar2 is chosen) */}
+      <SegmentedCommitBar
+        value={value}
+        highlightValue={bar3Val ?? null}      // ✅ highlight by bar3 selection only
+        labelsEnabled={start3 != null}        // ✅ show numbers only after bar2 picked
+        onChange={(h) => {
+          if (start3 == null) return;
+          setBar3Val(h);
+          onChange(h);                        // total becomes this absolute end value
+        }}
+        segments={segments}
+        step={step}
+        start={start3 ?? 0}
+        colorForIndex={(idx) => colorBarN(idx)}
+        showLabelAtIndex={fullHourLabel}
+        disabled={start3 == null}
+      />
+    </div>
+  );
+}
+
+/* ---------- MAIN COMPONENT ---------- */
+
+export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
+  return (
+    <div className="space-y-4">
+      {/* Focus: 3 chained bars */}
+      <FocusTimeMultiBars
+        value={commitments.focusTime}
+        onChange={(h) => onUpdateCommitment('focusTime', h)}
+      />
+
+      {/* Sleep: 5.5–9.0h */}
       <SegmentedCommitBar
         title="Sleep"
         subtitle="(recommended 7–9h)"
         value={commitments.sleep}
         onChange={(h) => onUpdateCommitment('sleep', h)}
-        segments={7}
+        segments={8}
         step={0.5}
-        // 6.0h (idx 0) = orange, 6.5–9.0h (idx 1–6) = green
-        colorForIndex={(idx) => (idx === 0 ? 'orange' : 'green')}
-        // labels at 7, 8, 9
-        showLabelAtIndex={(idx) => {
-          const hourAt = 6 + (idx + 1) * 0.5 - 0.5; // map idx 0..6 to 6.0..9.0
-          const val = 6 + idx * 0.5; // actual start at each idx
-          const display = val + 0.5; // center label on square
-          const rounded = Math.round(display);
-          return display === rounded ? String(rounded) : undefined;
-        }}
+        start={5.0} // 5.5, 6.0, ..., 9.0
+        colorForIndex={(_idx, endVal) =>
+          endVal <= 6.0 ? 'red' : endVal === 6.5 ? 'orange' : 'green'
+        }
+        showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
+        tipForEndVal={tipSleep}
       />
 
-      {/* Nutrition: 1.0–3.0h (5 squares, 0.5h each, all green) */}
+      {/* Nutrition: 0.5–3.0h */}
       <SegmentedCommitBar
         title="Nutrition / Meals"
         subtitle="(recommended 1–3h)"
         value={commitments.nutrition}
         onChange={(h) => onUpdateCommitment('nutrition', h)}
-        segments={5}
+        segments={7}
         step={0.5}
-        colorForIndex={() => 'green'}
-        // labels at 1, 2, 3
-        showLabelAtIndex={(idx) => {
-          const hourAt = 1 + idx * 0.5 + 0.5; // 1.0..3.0 labels on integers
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
-        }}
+        start={0.0} // 0.5, 1.0, ..., 3.0
+        colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'green')}
+        showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
+        tipForEndVal={tipNutrition}
       />
 
-      {/* Movement: 0.5–2.0h (4 squares, 0.5h each, all green) */}
+      {/* Movement: 0.5–4.0h */}
       <SegmentedCommitBar
         title="Movement"
-        subtitle="(0.5–2h)"
+        subtitle="(0.5–4h)"
         value={commitments.movement}
         onChange={(h) => onUpdateCommitment('movement', h)}
-        segments={4}
+        segments={8}
         step={0.5}
+        start={0.0}
         colorForIndex={() => 'green'}
-        // labels at 1, 2
-        showLabelAtIndex={(idx) => {
-          const hourAt = (idx + 1) * 0.5;
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
-        }}
+        showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
+        tipForEndVal={tipMovement}
       />
 
-      {/* Downtime: 1.0–2.5h (4 squares, 0.5h each, all green) */}
+      {/* Downtime: 0.5–3.0h */}
       <SegmentedCommitBar
         title="Downtime"
-        subtitle="(1–2.5h)"
+        subtitle="(0.5–3h)"
         value={commitments.downtime}
         onChange={(h) => onUpdateCommitment('downtime', h)}
-        segments={4}
+        segments={6}
         step={0.5}
+        start={0.0}
         colorForIndex={() => 'green'}
-        // labels at 1, 1.5, 2, 2.5 (show 1,2 only if you prefer)
-        showLabelAtIndex={(idx) => String((idx + 1) * 0.5 + 0.5)} // center-ish labels like 1,1.5,2,2.5
+        showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
+        tipForEndVal={tipDowntime}
       />
     </div>
   );
