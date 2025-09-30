@@ -4,40 +4,35 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
 interface TaskInputProps {
-  onAddTask: (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
+  onAddTask: (title: string, duration: number, scheduledDay?: 'today' | 'tomorrow') => void;
 }
+
 
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [value, setValue] = useState('');
 
-  // ========= NEW: Bucketing rules per your spec =========
-  //  >=1 & <20  -> 15
-  //  >=20 & <=40 -> 30
-  //  >=41 & <=70 -> 60
-  //  >70 -> break into multiple 60s; remainder mapped by same rules
-  function minutesToBuckets(total: number): Array<15 | 30 | 60> {
-    const buckets: Array<15 | 30 | 60> = [];
-    if (!Number.isFinite(total) || total <= 0) return buckets;
+// NEW: map total minutes per your rules.
+//  >10 && <20  -> 15
+//  >25 && <35  -> 30
+//  >=45 && <=65 -> 60
+//  else -> raw duration (no split, no bucket)
+function minutesToDurations(total: number): number[] {
+  const out: number[] = [];
+  if (!Number.isFinite(total) || total <= 0) return out;
 
-    // peel off 60s while strictly above 70
-    while (total > 70) {
-      buckets.push(60);
-      total -= 60;
-    }
-
-    // remainder mapping
-    if (total >= 41 && total <= 70) {
-      buckets.push(60);
-    } else if (total >= 20 && total <= 40) {
-      buckets.push(30);
-    } else if (total >= 1 && total < 20) {
-      buckets.push(15);
-    }
-    // total <= 0 -> nothing
-
-    return buckets;
+  if (total > 10 && total < 20) {
+    out.push(15);
+  } else if (total > 25 && total < 35) {
+    out.push(30);
+  } else if (total >= 45 && total <= 65) {
+    out.push(60);
+  } else {
+    // "rest should just be its own duration"
+    out.push(total);
   }
+  return out;
+}
 
   // ========= NEW: Parse & strip duration from a single line =========
   // Handles:
@@ -112,14 +107,14 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
     const { totalMinutes, title: cleaned } = extractDurationAndCleanTitle(line);
     if (!cleaned) return; // avoid adding empty titles
 
-    if (totalMinutes > 0) {
-      const buckets = minutesToBuckets(totalMinutes);
-      if (buckets.length > 0) {
-        // same cleaned title + same scheduled day ("today") for all
-        buckets.forEach((b) => onAddTask(cleaned, b, 'today'));
-        return;
-      }
-    }
+   if (totalMinutes > 0) {
+  const durations = minutesToDurations(totalMinutes);
+  if (durations.length > 0) {
+    durations.forEach((d) => onAddTask(cleaned, d, 'today'));
+    return;
+  }
+}
+
 
 // No duration parsed → let taskAI (edge) decide by omitting duration
 onAddTask(cleaned, undefined, 'today');
