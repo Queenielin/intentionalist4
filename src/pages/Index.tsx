@@ -4,8 +4,6 @@ import { supabase } from '../integrations/supabase/client';
 import TaskInput from '../components/TaskInput';
 import TaskGrid from '../components/TaskGrid';
 import CalendarView from '../components/CalendarView';
-import WorkloadSummary from '../components/WorkloadSummary';
-import { parseTaskInput } from '../utils/taskAI';
 import { Button } from '../components/ui/button';
 import { Calendar, List } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,11 +14,13 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
   const [commitments, setCommitments] = useState({
     focusTime: 0,
-    sleep: 0,
-    nutrition: 0
+    sleep: 8,
+    nutrition: 2,
+    movement: 1,
+    downtime: 1,
   });
 
-  const addTask = async (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+  const addTask = async (title: string, duration?: number, scheduledDay?: 'today' | 'tomorrow') => {
     const hasManualDuration = duration !== undefined;
     
     const newTask: Task = {
@@ -112,7 +112,10 @@ const Index = () => {
     setTasks(prev => [...prev, newTask]);
   };
 
-  const updateCommitment = (type: 'focusTime' | 'sleep' | 'nutrition', hours: number) => {
+  const updateCommitment = (
+    type: 'focusTime' | 'sleep' | 'nutrition' | 'movement' | 'downtime',
+    hours: number
+  ) => {
     setCommitments(prev => ({
       ...prev,
       [type]: hours
@@ -123,14 +126,6 @@ const Index = () => {
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar - Task Input */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">COMMIT</h2>
-          <CommitSection 
-            commitments={commitments}
-            onUpdateCommitment={updateCommitment}
-          />
-        </div>
-        
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Task</h2>
           <TaskInput onAddTask={addTask} />
@@ -167,6 +162,15 @@ const Index = () => {
           </div>
         </div>
 
+        {/* Commitment segment BEFORE Task Manager / Planning */}
+        <div className="px-6 py-4 bg-white border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Commit</h2>
+          <CommitSection 
+            commitments={commitments}
+            onUpdateCommitment={updateCommitment}
+          />
+        </div>
+
         {/* Planning Label */}
         {currentView === 'planning' && (
           <>
@@ -175,56 +179,49 @@ const Index = () => {
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">Daily Commitment</h3>
                 <span className="text-sm text-gray-500">
-                  {commitments.focusTime + commitments.sleep + commitments.nutrition}/24 hours
+                  {(commitments.focusTime + commitments.sleep + commitments.nutrition + commitments.movement + commitments.downtime).toFixed(1)}/24 hours
                 </span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden mb-3">
-                {/* Focus Time Bar */}
-                {commitments.focusTime > 0 && (
-                  <div 
-                    className="h-full bg-gradient-to-r from-[hsl(var(--deep-work))] to-[hsl(var(--deep-work))] opacity-30 float-left transition-all duration-300"
-                    style={{ width: `${(commitments.focusTime / 24) * 100}%` }}
-                    title={`Focus Time: ${commitments.focusTime}hr`}
-                  />
-                )}
-                {/* Sleep Bar */}
+
+              {/* 24h translucent target bar */}
+              <div className="w-full h-4 rounded-full overflow-hidden bg-muted/30 ring-1 ring-border/50 flex">
+                {/* Sleep (grey) */}
                 {commitments.sleep > 0 && (
-                  <div 
-                    className="h-full bg-purple-400 bg-opacity-60 float-left transition-all duration-300"
-                    style={{ width: `${(commitments.sleep / 24) * 100}%` }}
-                    title={`Sleep: ${commitments.sleep}hr`}
-                  />
+                  <div className="bg-zinc-400/40 h-full" style={{ width: `${(commitments.sleep / 24) * 100}%` }} title={`Sleep: ${commitments.sleep}h`} />
                 )}
-                {/* Nutrition Bar */}
+                {/* Focus (deep tint) */}
+                {commitments.focusTime > 0 && (
+                  <div className="bg-blue-500/25 h-full" style={{ width: `${(commitments.focusTime / 24) * 100}%` }} title={`Focus: ${commitments.focusTime}h`} />
+                )}
+                {/* Nutrition (violet tint) */}
                 {commitments.nutrition > 0 && (
-                  <div 
-                    className="h-full bg-green-400 bg-opacity-60 float-left transition-all duration-300"
-                    style={{ width: `${(commitments.nutrition / 24) * 100}%` }}
-                    title={`Nutrition: ${commitments.nutrition}hr`}
-                  />
+                  <div className="bg-violet-500/25 h-full" style={{ width: `${(commitments.nutrition / 24) * 100}%` }} title={`Nutrition: ${commitments.nutrition}h`} />
                 )}
+                {/* Movement (emerald tint) */}
+                {commitments.movement > 0 && (
+                  <div className="bg-emerald-500/25 h-full" style={{ width: `${(commitments.movement / 24) * 100}%` }} title={`Movement: ${commitments.movement}h`} />
+                )}
+                {/* Downtime (sky tint) */}
+                {commitments.downtime > 0 && (
+                  <div className="bg-sky-500/25 h-full" style={{ width: `${(commitments.downtime / 24) * 100}%` }} title={`Downtime: ${commitments.downtime}h`} />
+                )}
+                {/* Remainder */}
+                {(() => {
+                  const used = commitments.focusTime + commitments.sleep + commitments.nutrition + commitments.movement + commitments.downtime;
+                  const remain = Math.max(0, 24 - used);
+                  return remain > 0 ? (
+                    <div className="bg-muted/40 h-full" style={{ width: `${(remain / 24) * 100}%` }} title={`Unallocated: ${remain}h`} />
+                  ) : null;
+                })()}
               </div>
-              
+
               {/* Legend */}
-              <div className="flex gap-4 text-xs text-gray-600">
-                {commitments.focusTime > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-gradient-to-r from-[hsl(var(--deep-work))] to-[hsl(var(--deep-work))] opacity-30 rounded-full"></div>
-                    <span>Focus ({commitments.focusTime}h)</span>
-                  </div>
-                )}
-                {commitments.sleep > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-purple-400 bg-opacity-60 rounded-full"></div>
-                    <span>Sleep ({commitments.sleep}h)</span>
-                  </div>
-                )}
-                {commitments.nutrition > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-green-400 bg-opacity-60 rounded-full"></div>
-                    <span>Nutrition ({commitments.nutrition}h)</span>
-                  </div>
-                )}
+              <div className="flex flex-wrap gap-4 text-xs text-gray-600 mt-2">
+                {commitments.sleep > 0 && <Legend color="bg-zinc-400/40" label={`Sleep (${commitments.sleep}h)`} />}
+                {commitments.focusTime > 0 && <Legend color="bg-blue-500/25" label={`Focus (${commitments.focusTime}h)`} />}
+                {commitments.nutrition > 0 && <Legend color="bg-violet-500/25" label={`Nutrition (${commitments.nutrition}h)`} />}
+                {commitments.movement > 0 && <Legend color="bg-emerald-500/25" label={`Movement (${commitments.movement}h)`} />}
+                {commitments.downtime > 0 && <Legend color="bg-sky-500/25" label={`Downtime (${commitments.downtime}h)`} />}
               </div>
             </div>
 
@@ -257,5 +254,14 @@ const Index = () => {
     </div>
   );
 };
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <div className={`w-3 h-3 rounded ${color}`} />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export default Index;
