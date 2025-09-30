@@ -145,20 +145,20 @@ onAddTask(cleaned, undefined, 'today');
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          className="resize-none border-2 border-primary/30 focus:border-primary text-base min-h-[60px]"
+          className="resize-none border-2 border-primary/30 focus:border-primary text-base min-h-[60px] max-h-[120px] overflow-y-auto"
           placeholder="Add your tasks here..."
         />
       </div>
 
       <Button 
         onClick={handleSubmit} 
-        className="w-full px-6 py-3 h-auto text-base font-medium"
+        className="w-full px-6 py-3 h-auto text-base font-medium sticky bottom-0 bg-primary"
         size="lg"
       >
         + Add Task
       </Button>
       
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground sticky bottom-12 bg-white p-2 rounded">
         ➕ Add multiple tasks at once<br/>
         ⏱ Specify time (e.g., 1hr, 30min, 30m)<br/>
         ⌘ Press Ctrl+Enter to input tasks<br/>

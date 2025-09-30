@@ -148,6 +148,18 @@ const Index = () => {
           </div>
         </div>
 
+        {/* Workload Summary */}
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <WorkloadSummary tasks={tasks} />
+        </div>
+
+        {/* Planning Label */}
+        {currentView === 'planning' && (
+          <div className="px-6 py-2 bg-white border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Planning</h2>
+          </div>
+        )}
+
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6">
           {currentView === 'planning' ? (
