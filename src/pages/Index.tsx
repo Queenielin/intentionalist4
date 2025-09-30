@@ -15,6 +15,8 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
 
   const addTask = async (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+    const hasManualDuration = duration !== undefined;
+    
     const newTask: Task = {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
@@ -54,7 +56,7 @@ const Index = () => {
                 isCategorizing: false, 
                 category: classification.category,
                 title: classification.title, // Use cleaned title from AI
-                duration: classification.duration
+                duration: hasManualDuration ? (duration || 30) : classification.duration
               } 
             : t
         ));
