@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface Commitments {
@@ -18,186 +17,166 @@ interface CommitSectionProps {
   ) => void;
 }
 
-const COLORS = {
-  // Deep work color family
-  deep: { base: 'bg-blue-500', tint: 'bg-blue-500/25' }, // focus time uses tint
-  sleep: { tint: 'bg-zinc-400/40' },
-  nutrition: { tint: 'bg-violet-500/25' },
-  movement: { tint: 'bg-emerald-500/25' },
-  downtime: { tint: 'bg-sky-500/25' },
-  remainder: { base: 'bg-muted/40' },
-};
-
-const pct = (h: number) => Math.max(0, Math.min(100, (h / 24) * 100));
-const fmt = (h: number) => (Number.isInteger(h) ? `${h}h` : `${h}h`);
-
-export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
-  /** OPTIONS **/
-  const focusTimeOptions = [
-    // keep your traffic-light intent; you asked for buttons, not ranges here
-    { hours: 1, color: 'red' },
-    { hours: 2, color: 'orange' },
-    { hours: 3, color: 'green' },
-    { hours: 4, color: 'green' },
-    { hours: 5, color: 'green' },
-  ];
-
-  const sleepOptions = [
-    { hours: 6, color: 'red' },
-    { hours: 7, color: 'green' },
-    { hours: 7.5, color: 'green' },
-    { hours: 8, color: 'green' },
-    { hours: 8.5, color: 'green' },
-    { hours: 9, color: 'green' },
-  ];
-
-  const nutritionOptions = [
-    { hours: 1, color: 'green' },
-    { hours: 1.5, color: 'green' },
-    { hours: 2, color: 'green' },
-    { hours: 2.5, color: 'green' },
-    { hours: 3, color: 'green' },
-  ];
-
-  const movementOptions = [
-    { hours: 0.5, color: 'green' },
-    { hours: 1, color: 'green' },
-    { hours: 1.5, color: 'green' },
-    { hours: 2, color: 'green' },
-  ];
-
-  const downtimeOptions = [
-    { hours: 1, color: 'green' },
-    { hours: 1.5, color: 'green' },
-    { hours: 2, color: 'green' },
-  ];
-
-  /** STYLES **/
-  const getButtonClass = (color: string, isSelected: boolean) => {
-    const baseClass = 'h-8 px-3 text-sm font-medium transition-all duration-200 rounded-md';
-    if (isSelected) {
-      switch (color) {
-        case 'green':
-          return cn(baseClass, 'bg-green-600 text-white border-green-600 shadow-md');
-        case 'orange':
-          return cn(baseClass, 'bg-orange-500 text-white border-orange-500 shadow-md');
-        case 'red':
-          return cn(baseClass, 'bg-red-500 text-white border-red-500 shadow-md');
-        default:
-          return cn(baseClass, 'bg-gray-200 text-gray-700');
-      }
-    }
-    switch (color) {
-      case 'green':
-        return cn(baseClass, 'bg-green-100 text-green-700 border border-green-300 hover:bg-green-200');
-      case 'orange':
-        return cn(baseClass, 'bg-orange-100 text-orange-700 border border-orange-300 hover:bg-orange-200');
-      case 'red':
-        return cn(baseClass, 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200');
-      default:
-        return cn(baseClass, 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200');
-    }
-  };
-
-  /** BAR DATA **/
-  return (
-    <div className="space-y-4">
-      {/* Focus Time */}
-      <Section
-        title="Focus Time"
-        subtitle="(deep work target)"
-        options={focusTimeOptions}
-        selected={commitments.focusTime}
-        onClick={(h) => onUpdateCommitment('focusTime', commitments.focusTime === h ? 0 : h)}
-        getButtonClass={getButtonClass}
-      />
-
-      {/* Sleep */}
-      <Section
-        title="Sleep"
-        subtitle="(recommended 7–9h)"
-        options={sleepOptions}
-        selected={commitments.sleep}
-        onClick={(h) => onUpdateCommitment('sleep', commitments.sleep === h ? 0 : h)}
-        getButtonClass={getButtonClass}
-      />
-
-      {/* Nutrition */}
-      <Section
-        title="Nutrition / Meals"
-        subtitle="(recommended 1–3h)"
-        options={nutritionOptions}
-        selected={commitments.nutrition}
-        onClick={(h) => onUpdateCommitment('nutrition', commitments.nutrition === h ? 0 : h)}
-        getButtonClass={getButtonClass}
-      />
-
-      {/* Movement */}
-      <Section
-        title="Movement"
-        subtitle="(0.5–2h)"
-        options={movementOptions}
-        selected={commitments.movement}
-        onClick={(h) => onUpdateCommitment('movement', commitments.movement === h ? 0 : h)}
-        getButtonClass={getButtonClass}
-      />
-
-      {/* Downtime */}
-      <Section
-        title="Downtime"
-        subtitle="(1–2h)"
-        options={downtimeOptions}
-        selected={commitments.downtime}
-        onClick={(h) => onUpdateCommitment('downtime', commitments.downtime === h ? 0 : h)}
-        getButtonClass={getButtonClass}
-      />
-    </div>
-  );
-}
-
-/** Small section helper */
-function Section({
+/** Generic segmented clickable bar (squares) */
+function SegmentedCommitBar({
   title,
   subtitle,
-  options,
-  selected,
-  onClick,
-  getButtonClass,
+  value,
+  onChange,
+  segments = 10,
+  step = 0.5,
+  colorForIndex,
+  showLabelAtIndex,
+  lightDividerAt,
 }: {
   title: string;
   subtitle?: string;
-  options: Array<{ hours: number; color: 'green' | 'orange' | 'red' }>;
-  selected: number;
-  onClick: (h: number) => void;
-  getButtonClass: (color: string, isSelected: boolean) => string;
+  value: number;
+  onChange: (h: number) => void;
+  segments?: number;
+  step?: number;
+  colorForIndex: (idx: number) => 'red' | 'orange' | 'green';
+  showLabelAtIndex?: (idx: number) => string | undefined;
+  lightDividerAt?: number; // draw a lighter divider after this index (i.e., between #lightDividerAt and #lightDividerAt+1)
 }) {
+  const selectedIdx = Math.max(-1, Math.round(value / step) - 1); // -1 means nothing selected
+
   return (
-    <div>
+    <div className="mb-4">
       <h3 className="text-sm font-medium text-gray-700 mb-2">
-        {title} <span className="text-xs text-muted-foreground">{subtitle}</span>
+        {title} {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
       </h3>
-      <div className="flex flex-wrap gap-2">
-        {options.map(({ hours, color }) => (
-          <Button
-            key={`${title}-${hours}`}
-            variant="outline"
-            size="sm"
-            className={getButtonClass(color, selected === hours)}
-            onClick={() => onClick(hours)}
-          >
-            {Number.isInteger(hours) ? `${hours}h` : `${hours}h`}
-          </Button>
-        ))}
+
+      <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
+        {Array.from({ length: segments }).map((_, idx) => {
+          const h = (idx + 1) * step;                   // hours represented by this square
+          const tone = colorForIndex(idx);              // red | orange | green
+          const active = idx <= selectedIdx;
+
+          const bg = tone === 'red'
+            ? (active ? 'bg-red-500'    : 'bg-red-100')
+            : tone === 'orange'
+            ? (active ? 'bg-orange-500' : 'bg-orange-100')
+            : (active ? 'bg-green-600'  : 'bg-green-100');
+
+          const fg = active ? 'text-white' : (
+            tone === 'red' ? 'text-red-700' : tone === 'orange' ? 'text-orange-700' : 'text-green-700'
+          );
+
+          // borders between squares; lighter divider at requested boundary
+          const divider = idx === 0
+            ? '' 
+            : (idx === lightDividerAt ? 'border-l border-l-gray-200' : 'border-l border-l-gray-300');
+
+          const label = showLabelAtIndex ? showLabelAtIndex(idx) : undefined;
+
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onChange(h)}
+              title={`${h} hours`}
+              className={cn(
+                'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
+                bg, fg, divider,
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
+              )}
+              aria-pressed={active}
+            >
+              {label ? <span className="pointer-events-none">{label}</span> : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function LegendSwatch({ className, label }: { className: string; label: string }) {
+export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
   return (
-    <div className="flex items-center gap-2">
-      <span className={cn('inline-block w-3 h-3 rounded', className)} />
-      <span>{label}</span>
+    <div className="space-y-4">
+      {/* Focus Time: 0.5–5.0h (10 squares, 0.5h each) */}
+      <SegmentedCommitBar
+        title="Focus Time"
+        subtitle="(deep work target)"
+        value={commitments.focusTime}
+        onChange={(h) => onUpdateCommitment('focusTime', h)}
+        segments={10}
+        step={0.5}
+        // 0–1h = red (idx 0–1), 1–2h = orange (idx 2–3), ≥2h = green (idx 4–9)
+        colorForIndex={(idx) => (idx <= 1 ? 'red' : idx <= 3 ? 'orange' : 'green')}
+        // labels 1..5 on even squares (2,4,6,8,10)
+        showLabelAtIndex={(idx) => {
+          const hourAt = (idx + 1) * 0.5;
+          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+        }}
+        lightDividerAt={1} // lighter line between first (0.5h) and second (1.0h)
+      />
+
+      {/* Sleep: 6.0–9.0h (7 squares, 0.5h each) */}
+      <SegmentedCommitBar
+        title="Sleep"
+        subtitle="(recommended 7–9h)"
+        value={commitments.sleep}
+        onChange={(h) => onUpdateCommitment('sleep', h)}
+        segments={7}
+        step={0.5}
+        // 6.0h (idx 0) = orange, 6.5–9.0h (idx 1–6) = green
+        colorForIndex={(idx) => (idx === 0 ? 'orange' : 'green')}
+        // labels at 7, 8, 9
+        showLabelAtIndex={(idx) => {
+          const hourAt = 6 + (idx + 1) * 0.5 - 0.5; // map idx 0..6 to 6.0..9.0
+          const val = 6 + idx * 0.5; // actual start at each idx
+          const display = val + 0.5; // center label on square
+          const rounded = Math.round(display);
+          return display === rounded ? String(rounded) : undefined;
+        }}
+      />
+
+      {/* Nutrition: 1.0–3.0h (5 squares, 0.5h each, all green) */}
+      <SegmentedCommitBar
+        title="Nutrition / Meals"
+        subtitle="(recommended 1–3h)"
+        value={commitments.nutrition}
+        onChange={(h) => onUpdateCommitment('nutrition', h)}
+        segments={5}
+        step={0.5}
+        colorForIndex={() => 'green'}
+        // labels at 1, 2, 3
+        showLabelAtIndex={(idx) => {
+          const hourAt = 1 + idx * 0.5 + 0.5; // 1.0..3.0 labels on integers
+          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+        }}
+      />
+
+      {/* Movement: 0.5–2.0h (4 squares, 0.5h each, all green) */}
+      <SegmentedCommitBar
+        title="Movement"
+        subtitle="(0.5–2h)"
+        value={commitments.movement}
+        onChange={(h) => onUpdateCommitment('movement', h)}
+        segments={4}
+        step={0.5}
+        colorForIndex={() => 'green'}
+        // labels at 1, 2
+        showLabelAtIndex={(idx) => {
+          const hourAt = (idx + 1) * 0.5;
+          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+        }}
+      />
+
+      {/* Downtime: 1.0–2.5h (4 squares, 0.5h each, all green) */}
+      <SegmentedCommitBar
+        title="Downtime"
+        subtitle="(1–2.5h)"
+        value={commitments.downtime}
+        onChange={(h) => onUpdateCommitment('downtime', h)}
+        segments={4}
+        step={0.5}
+        colorForIndex={() => 'green'}
+        // labels at 1, 1.5, 2, 2.5 (show 1,2 only if you prefer)
+        showLabelAtIndex={(idx) => String((idx + 1) * 0.5 + 0.5)} // center-ish labels like 1,1.5,2,2.5
+      />
     </div>
   );
 }
