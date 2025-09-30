@@ -28,14 +28,64 @@ const Index = () => {
 
     setTasks(prev => [...prev, newTask]);
 
-    // Simulate AI categorization (you can replace this with actual API call)
-    setTimeout(() => {
+    // Call the actual edge function for categorization
+    try {
+      const response = await fetch('/functions/v1/categorize-tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          tasks: [title],
+          stream: false
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const classification = data.classifications?.[0];
+        
+        if (classification) {
+          setTasks(prev => prev.map(t => 
+            t.id === newTask.id 
+              ? { 
+                  ...t, 
+                  isCategorizing: false, 
+                  category: classification.category,
+                  title: classification.title, // Use cleaned title from AI
+                  duration: classification.duration
+                } 
+              : t
+          ));
+        } else {
+          // Fallback if no classification returned
+          setTasks(prev => prev.map(t => 
+            t.id === newTask.id 
+              ? { ...t, isCategorizing: false } 
+              : t
+          ));
+        }
+      } else {
+        console.error('Failed to categorize task:', response.statusText);
+        // Fallback on error
+        setTasks(prev => prev.map(t => 
+          t.id === newTask.id 
+            ? { ...t, isCategorizing: false } 
+            : t
+        ));
+        toast.error('Failed to categorize task');
+      }
+    } catch (error) {
+      console.error('Error calling categorization function:', error);
+      // Fallback on error
       setTasks(prev => prev.map(t => 
         t.id === newTask.id 
-          ? { ...t, isCategorizing: false, category: 'Creative × Generative' } // Example category
+          ? { ...t, isCategorizing: false } 
           : t
       ));
-    }, 1000);
+      toast.error('Failed to categorize task');
+    }
   };
 
   const updateTask = (taskId: string, updates: Partial<Task>) => {
