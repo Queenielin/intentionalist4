@@ -1,23 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { Task } from '../types/task';
+import { Task, Category8, CATEGORIES_8 } from '../types/task';
 import TaskInput from '../components/TaskInput';
-import TaskList from '../components/TaskList';
+import TaskGrid from '../components/TaskGrid';
 import CalendarView from '../components/CalendarView';
 import WorkloadSummary from '../components/WorkloadSummary';
+import { parseTaskInput } from '../utils/taskAI';
 import { Button } from '../components/ui/button';
 import { Calendar, List } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
 
-  const addTask = (task: Task) => {
-    setTasks(prev => [...prev, task]);
+  const addTask = async (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+    const newTask: Task = {
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title,
+      category: 'Social & Relational', // Default category while AI processes
+      duration,
+      completed: false,
+      slotId: '',
+      scheduledDay: scheduledDay || 'today',
+      createdAt: new Date(),
+      isCategorizing: true,
+    };
+
+    setTasks(prev => [...prev, newTask]);
+
+    // Simulate AI categorization (you can replace this with actual API call)
+    setTimeout(() => {
+      setTasks(prev => prev.map(t => 
+        t.id === newTask.id 
+          ? { ...t, isCategorizing: false, category: 'Creative × Generative' } // Example category
+          : t
+      ));
+    }, 1000);
   };
 
-  const updateTask = (updatedTask: Task) => {
+  const updateTask = (taskId: string, updates: Partial<Task>) => {
     setTasks(prev => prev.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
+      task.id === taskId ? { ...task, ...updates } : task
     ));
   };
 
@@ -25,6 +48,21 @@ const Index = () => {
     setTasks(prev => prev.filter(task => task.id !== taskId));
   };
 
+  const completeTask = (taskId: string) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    ));
+  };
+
+  const duplicateTask = (task: Task) => {
+    const newTask: Task = {
+      ...task,
+      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      completed: false,
+      createdAt: new Date(),
+    };
+    setTasks(prev => [...prev, newTask]);
+  };
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar - Task Input */}
@@ -70,16 +108,19 @@ const Index = () => {
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6">
           {currentView === 'planning' ? (
-            <TaskList 
+            <TaskGrid
               tasks={tasks} 
+              day="today"
               onUpdateTask={updateTask}
               onDeleteTask={deleteTask}
+              onDuplicateTask={duplicateTask}
+              onCompleteTask={completeTask}
+              onAddTask={addTask}
             />
           ) : (
             <CalendarView 
               tasks={tasks}
-              onUpdateTask={updateTask}
-              onDeleteTask={deleteTask}
+              onTaskUpdate={setTasks}
             />
           )}
         </div>
