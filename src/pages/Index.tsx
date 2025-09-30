@@ -13,12 +13,12 @@ const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
 
-  const addTask = async (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
+  const addTask = async (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
     const newTask: Task = {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
       category: 'Social & Relational', // Default category while AI processes
-      duration,
+      duration: duration || 30, // Default to 30 if not provided
       completed: false,
       slotId: '',
       scheduledDay: scheduledDay || 'today',
@@ -30,7 +30,8 @@ const Index = () => {
 
     // Call the actual edge function for categorization
     try {
-      const response = await fetch('/functions/v1/categorize-tasks', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://kerstiyewadsqwkvrafq.supabase.co';
+      const response = await fetch(`${supabaseUrl}/functions/v1/categorize-tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,8 +43,11 @@ const Index = () => {
         })
       });
 
+      console.log('Edge function response status:', response.status);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Edge function response data:', data);
         const classification = data.classifications?.[0];
         
         if (classification) {
@@ -67,7 +71,8 @@ const Index = () => {
           ));
         }
       } else {
-        console.error('Failed to categorize task:', response.statusText);
+        const errorText = await response.text();
+        console.error('Failed to categorize task:', response.status, response.statusText, errorText);
         // Fallback on error
         setTasks(prev => prev.map(t => 
           t.id === newTask.id 
