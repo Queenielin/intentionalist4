@@ -12,13 +12,14 @@ import CommitSection from '../components/CommitSection';
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
-  const [commitments, setCommitments] = useState({
-    focusTime: 0,
-    sleep: 8,
-    nutrition: 2,
-    movement: 1,
-    downtime: 1,
-  });
+const [commitments, setCommitments] = useState({
+  focusTime: 3,    // ✅ default selected (green)
+  sleep: 8,
+  nutrition: 2,
+  movement: 1,
+  downtime: 1.5,   // ✅ default selected (green)
+});
+
 
   const addTask = async (title: string, duration?: number, scheduledDay?: 'today' | 'tomorrow') => {
     const hasManualDuration = duration !== undefined;
