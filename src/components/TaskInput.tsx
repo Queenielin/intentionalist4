@@ -55,10 +55,10 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
       </Button>
       
       <div className="text-sm text-muted-foreground">
-       
+         ➕ Add multiple tasks at once  <br/>
+  ⏱ Specify time (e.g., 1hr, 30min, 30m) <br/>
         ⌘ Press Ctrl+Enter to input tasks  <br/>
-  • Add multiple tasks at once  <br/>
- • Specify time (e.g., "1hr", "30min") <br/>
+
       </div>
     </div>
   );
