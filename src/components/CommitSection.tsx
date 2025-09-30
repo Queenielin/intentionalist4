@@ -89,12 +89,12 @@ function tipDowntime(endVal: number) {
   return 'Aim for consistent daily recovery to protect sleep and focus quality.';
 }
 
-/* ---------- GENERIC SEGMENTED BAR WITH TOOLTIP ---------- */
-
 function SegmentedCommitBar({
   title,
   subtitle,
   value,
+  highlightValue,          // ✅ new: what to use for highlighting (defaults to value)
+  labelsEnabled = true,    // ✅ new: whether to render numbers on squares
   onChange,
   segments,
   step = 0.5,
@@ -103,11 +103,12 @@ function SegmentedCommitBar({
   showLabelAtIndex,
   lightDividerAt,
   disabled = false,
-  tipForEndVal, // <-- function to supply tooltip string per square
 }: {
   title?: string;
   subtitle?: string;
-  value: number;
+  value: number;                         // total/canonical value
+  highlightValue?: number | null;        // ✅ which value controls the filled squares for THIS bar
+  labelsEnabled?: boolean;               // ✅ whether to show labels on this bar
   onChange: (h: number) => void;
   segments: number;
   step?: number;
@@ -116,16 +117,15 @@ function SegmentedCommitBar({
   showLabelAtIndex?: (idx: number, endVal: number) => string | undefined;
   lightDividerAt?: number;
   disabled?: boolean;
-  tipForEndVal?: (endVal: number) => string;
 }) {
-  const selectedIdx = Math.max(-1, Math.round((value - start) / step) - 1); // -1 => none
+  const basis = highlightValue ?? value; // ✅ use bar-specific selection when provided
+  const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1); // -1 => none
 
   return (
     <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
       {title ? (
         <h3 className="text-sm font-medium text-gray-700 mb-2">
-          {title}{' '}
-          {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
+          {title} {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
         </h3>
       ) : null}
 
@@ -137,16 +137,10 @@ function SegmentedCommitBar({
 
           const bg =
             tone === 'red'
-              ? active
-                ? 'bg-red-500'
-                : 'bg-red-100'
+              ? active ? 'bg-red-500' : 'bg-red-100'
               : tone === 'orange'
-              ? active
-                ? 'bg-orange-500'
-                : 'bg-orange-100'
-              : active
-              ? 'bg-green-600'
-              : 'bg-green-100';
+              ? active ? 'bg-orange-500' : 'bg-orange-100'
+              : active ? 'bg-green-600' : 'bg-green-100';
 
           const fg = active
             ? 'text-white'
@@ -163,14 +157,15 @@ function SegmentedCommitBar({
               ? 'border-l border-l-gray-200'
               : 'border-l border-l-gray-300';
 
-          const label = showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
-          const tip = tipForEndVal ? tipForEndVal(endVal) : `${endVal} hours`;
+          const label =
+            labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
 
-          const Square = (
+          return (
             <button
               key={idx}
               type="button"
               onClick={() => onChange(endVal)}
+              title={`${endVal} hours`}
               className={cn(
                 'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
                 bg,
@@ -183,25 +178,12 @@ function SegmentedCommitBar({
               {label ? <span className="pointer-events-none">{label}</span> : null}
             </button>
           );
-
-          return tip ? (
-            <Tooltip key={idx}>
-              <TooltipTrigger asChild>{Square}</TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs leading-snug">
-                <div className="font-medium mb-0.5">{endVal}h</div>
-                <div>{tip}</div>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            Square
-          );
         })}
       </div>
     </div>
   );
 }
 
-/* ---------- FOCUS: 3 CHAINED BARS ---------- */
 
 function FocusTimeMultiBars({
   value,
@@ -210,77 +192,97 @@ function FocusTimeMultiBars({
   value: number;
   onChange: (h: number) => void;
 }) {
-  const [firstPick, setFirstPick] = useState<number | null>(null);
-  const [secondPick, setSecondPick] = useState<number | null>(null);
+  // Bar-specific selections (absolute end values)
+  const [bar1Val, setBar1Val] = useState<number | null>(null); // e.g., 3.0
+  const [bar2Val, setBar2Val] = useState<number | null>(null); // e.g., 4.0
+  const [bar3Val, setBar3Val] = useState<number | null>(null); // e.g., 4.5
 
   const step = 0.5;
   const segments = 11;
 
   // Bar 1: 0.5 → 5.5
   const start1 = 0.0;
+
+  // Bar 2 start depends on Bar 1 selection (no numbers before bar1 is picked)
+  const start2 = bar1Val ?? null;
+
+  // Bar 3 start depends on Bar 2 selection (no numbers before bar2 is picked)
+  const start3 = bar2Val ?? null;
+
+  // Colors:
+  // Bar 1 special thresholds
   const colorBar1 = (_idx: number, endVal: number) => {
     if (endVal === 5.5) return 'red';
     if (endVal === 5.0 || endVal === 4.5) return 'orange';
     return 'green';
   };
 
-  // Bars 2 & 3: chained starts; 9th square orange, 11th red
-  const start2 = firstPick ?? (value <= 5.5 ? value : null);
-  const start3 = secondPick ?? (start2 != null ? value : null);
-  const colorBarN = (idx: number) => (idx === 10 ? 'red' : idx === 8 ? 'orange' : 'green');
+  // Bar 2 & 3: "only squares beyond the 9th become orange"
+  //   => squares 1..9 green, 10..11 orange
+  const colorBarN = (idx: number) => (idx >= 9 ? 'orange' : 'green');
 
-  const labelFullHours = (_idx: number, endVal: number) =>
+  // Labels only on full hours
+  const fullHourLabel = (_idx: number, endVal: number) =>
     Number.isInteger(endVal) ? String(endVal) : undefined;
 
   return (
     <div className="space-y-2">
+      {/* Bar 1 */}
       <SegmentedCommitBar
         title="Focus Time"
         subtitle="(deep work target)"
-        value={value}
+        value={value}                         // canonical (daily bar)
+        highlightValue={bar1Val ?? null}      // ✅ highlight by bar1 selection only
+        labelsEnabled={true}                  // labels visible
         onChange={(h) => {
-          setFirstPick(h);
-          setSecondPick(null);
-          onChange(h);
+          setBar1Val(h);
+          setBar2Val(null);
+          setBar3Val(null);
+          onChange(h);                        // total becomes bar1 value
         }}
         segments={segments}
         step={step}
         start={start1}
         colorForIndex={colorBar1}
-        showLabelAtIndex={labelFullHours}
+        showLabelAtIndex={fullHourLabel}
         lightDividerAt={1}
-        tipForEndVal={tipFocus}
       />
 
+      {/* Bar 2 (locked until bar1 is chosen) */}
       <SegmentedCommitBar
         value={value}
+        highlightValue={bar2Val ?? null}      // ✅ highlight by bar2 selection only
+        labelsEnabled={start2 != null}        // ✅ show numbers only after bar1 picked
         onChange={(h) => {
           if (start2 == null) return;
-          setSecondPick(h);
-          onChange(h);
+          setBar2Val(h);
+          setBar3Val(null);
+          onChange(h);                        // total becomes this absolute end value
         }}
         segments={segments}
         step={step}
         start={start2 ?? 0}
         colorForIndex={(idx) => colorBarN(idx)}
-        showLabelAtIndex={labelFullHours}
+        showLabelAtIndex={fullHourLabel}
         disabled={start2 == null}
-        tipForEndVal={tipFocus}
       />
 
+      {/* Bar 3 (locked until bar2 is chosen) */}
       <SegmentedCommitBar
         value={value}
+        highlightValue={bar3Val ?? null}      // ✅ highlight by bar3 selection only
+        labelsEnabled={start3 != null}        // ✅ show numbers only after bar2 picked
         onChange={(h) => {
           if (start3 == null) return;
-          onChange(h);
+          setBar3Val(h);
+          onChange(h);                        // total becomes this absolute end value
         }}
         segments={segments}
         step={step}
         start={start3 ?? 0}
         colorForIndex={(idx) => colorBarN(idx)}
-        showLabelAtIndex={labelFullHours}
+        showLabelAtIndex={fullHourLabel}
         disabled={start3 == null}
-        tipForEndVal={tipFocus}
       />
     </div>
   );
