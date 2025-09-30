@@ -37,9 +37,9 @@ function SegmentedCommitBar({
   step?: number;
   colorForIndex: (idx: number) => 'red' | 'orange' | 'green';
   showLabelAtIndex?: (idx: number) => string | undefined;
-  lightDividerAt?: number; // draw a lighter divider after this index (i.e., between #lightDividerAt and #lightDividerAt+1)
+  lightDividerAt?: number; // draw a lighter divider after this index (between #lightDividerAt and #lightDividerAt+1)
 }) {
-  const selectedIdx = Math.max(-1, Math.round(value / step) - 1); // -1 means nothing selected
+  const selectedIdx = Math.max(-1, Math.round(value / step) - 1); // -1 => none
 
   return (
     <div className="mb-4">
@@ -49,24 +49,29 @@ function SegmentedCommitBar({
 
       <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
         {Array.from({ length: segments }).map((_, idx) => {
-          const h = (idx + 1) * step;                   // hours represented by this square
-          const tone = colorForIndex(idx);              // red | orange | green
+          const h = (idx + 1) * step;    // hours at this square (end-value)
+          const tone = colorForIndex(idx);
           const active = idx <= selectedIdx;
 
-          const bg = tone === 'red'
-            ? (active ? 'bg-red-500'    : 'bg-red-100')
+          const bg =
+            tone === 'red'
+              ? active ? 'bg-red-500'    : 'bg-red-100'
+              : tone === 'orange'
+              ? active ? 'bg-orange-500' : 'bg-orange-100'
+              : active ? 'bg-green-600'  : 'bg-green-100';
+
+          const fg = active
+            ? 'text-white'
+            : tone === 'red'
+            ? 'text-red-700'
             : tone === 'orange'
-            ? (active ? 'bg-orange-500' : 'bg-orange-100')
-            : (active ? 'bg-green-600'  : 'bg-green-100');
+            ? 'text-orange-700'
+            : 'text-green-700';
 
-          const fg = active ? 'text-white' : (
-            tone === 'red' ? 'text-red-700' : tone === 'orange' ? 'text-orange-700' : 'text-green-700'
-          );
-
-          // borders between squares; lighter divider at requested boundary
-          const divider = idx === 0
-            ? '' 
-            : (idx === lightDividerAt ? 'border-l border-l-gray-200' : 'border-l border-l-gray-300');
+          const divider =
+            idx === 0
+              ? ''
+              : (idx === lightDividerAt ? 'border-l border-l-gray-200' : 'border-l border-l-gray-300');
 
           const label = showLabelAtIndex ? showLabelAtIndex(idx) : undefined;
 
@@ -95,87 +100,96 @@ function SegmentedCommitBar({
 export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
   return (
     <div className="space-y-4">
-      {/* Focus Time: 0.5–5.0h (10 squares, 0.5h each) */}
+      {/* Focus Time: 0.5–8.0h (16 squares, 0.5h each) */}
       <SegmentedCommitBar
         title="Focus Time"
         subtitle="(deep work target)"
         value={commitments.focusTime}
         onChange={(h) => onUpdateCommitment('focusTime', h)}
-        segments={10}
+        segments={16}
         step={0.5}
-        // 0–1h = red (idx 0–1), 1–2h = orange (idx 2–3), ≥2h = green (idx 4–9)
-        colorForIndex={(idx) => (idx <= 1 ? 'red' : idx <= 3 ? 'orange' : 'green')}
-        // labels 1..5 on even squares (2,4,6,8,10)
-        showLabelAtIndex={(idx) => {
-          const hourAt = (idx + 1) * 0.5;
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
-        }}
-        lightDividerAt={1} // lighter line between first (0.5h) and second (1.0h)
+        // Colors:
+        // 0.5–1.0h (idx 0–1): red
+        // 1.5–2.0h (idx 2–3): orange
+        // 2.5–5.0h (idx 4–9): green
+        // 5.5–6.0h (idx 10–11): orange
+        // 6.5–8.0h (idx 12–15): red
+        colorForIndex={(idx) =>
+          idx <= 1 ? 'red'
+          : idx <= 3 ? 'orange'
+          : idx <= 9 ? 'green'
+          : idx <= 11 ? 'orange'
+          : 'red'
+        }
+        // Labels at integers 1..8 → squares 2,4,6,8,10,12,14,16
+        showLabelAtIndex={(idx) => (((idx + 1) * 0.5) % 1 === 0 ? String((idx + 1) * 0.5) : undefined)}
+        lightDividerAt={1} // lighter line between 0.5h and 1.0h
       />
 
-      {/* Sleep: 6.0–9.0h (7 squares, 0.5h each) */}
+      {/* Sleep: 5.5–9.0h (8 squares, 0.5h each) */}
       <SegmentedCommitBar
         title="Sleep"
         subtitle="(recommended 7–9h)"
         value={commitments.sleep}
         onChange={(h) => onUpdateCommitment('sleep', h)}
-        segments={7}
+        segments={8}
         step={0.5}
-        // 6.0h (idx 0) = orange, 6.5–9.0h (idx 1–6) = green
-        colorForIndex={(idx) => (idx === 0 ? 'orange' : 'green')}
+        // 5.5 (idx 0) and 6.0 (idx 1) => red, rest => green
+        colorForIndex={(idx) => (idx <= 1 ? 'red' : 'green')}
         // labels at 7, 8, 9
         showLabelAtIndex={(idx) => {
-          const hourAt = 6 + (idx + 1) * 0.5 - 0.5; // map idx 0..6 to 6.0..9.0
-          const val = 6 + idx * 0.5; // actual start at each idx
-          const display = val + 0.5; // center label on square
-          const rounded = Math.round(display);
-          return display === rounded ? String(rounded) : undefined;
+          const val = 5.5 + (idx + 1) * 0.5; // 5.5,6.0,6.5,...,9.0
+          return Number.isInteger(val) && val >= 7 ? String(val) : undefined;
         }}
       />
 
-      {/* Nutrition: 1.0–3.0h (5 squares, 0.5h each, all green) */}
+      {/* Nutrition: 0.5–3.0h (7 squares, 0.5h each) */}
       <SegmentedCommitBar
         title="Nutrition / Meals"
         subtitle="(recommended 1–3h)"
         value={commitments.nutrition}
         onChange={(h) => onUpdateCommitment('nutrition', h)}
-        segments={5}
+        segments={7}
         step={0.5}
-        colorForIndex={() => 'green'}
+        // 0.5 => red (idx 0), 1.0 => orange (idx 1), 1.5–3.0 => green (idx 2+)
+        colorForIndex={(idx) => (idx === 0 ? 'red' : idx === 1 ? 'orange' : 'green')}
         // labels at 1, 2, 3
         showLabelAtIndex={(idx) => {
-          const hourAt = 1 + idx * 0.5 + 0.5; // 1.0..3.0 labels on integers
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+          const val = 0.5 + (idx + 1) * 0.5; // 0.5..3.0
+          return Number.isInteger(val) ? String(val) : undefined;
         }}
       />
 
-      {/* Movement: 0.5–2.0h (4 squares, 0.5h each, all green) */}
+      {/* Movement: 0.5–4.0h (8 squares, 0.5h each, all green) */}
       <SegmentedCommitBar
         title="Movement"
-        subtitle="(0.5–2h)"
+        subtitle="(0.5–4h)"
         value={commitments.movement}
         onChange={(h) => onUpdateCommitment('movement', h)}
-        segments={4}
+        segments={8}
         step={0.5}
         colorForIndex={() => 'green'}
-        // labels at 1, 2
+        // labels at 1, 2, 3, 4
         showLabelAtIndex={(idx) => {
-          const hourAt = (idx + 1) * 0.5;
-          return Number.isInteger(hourAt) ? String(hourAt) : undefined;
+          const val = (idx + 1) * 0.5;
+          return Number.isInteger(val) ? String(val) : undefined;
         }}
       />
 
-      {/* Downtime: 1.0–2.5h (4 squares, 0.5h each, all green) */}
+      {/* Downtime: 0.5–3.0h (6 squares, 0.5h each, all green) */}
       <SegmentedCommitBar
         title="Downtime"
-        subtitle="(1–2.5h)"
+        subtitle="(0.5–3h)"
         value={commitments.downtime}
         onChange={(h) => onUpdateCommitment('downtime', h)}
-        segments={4}
+        segments={6}
         step={0.5}
         colorForIndex={() => 'green'}
-        // labels at 1, 1.5, 2, 2.5 (show 1,2 only if you prefer)
-        showLabelAtIndex={(idx) => String((idx + 1) * 0.5 + 0.5)} // center-ish labels like 1,1.5,2,2.5
+        // no labels on halves; show 1, 2, 3 only
+        showLabelAtIndex={(idx) => {
+          const val = (idx + 1) * 0.5; // 0.5,1.0,1.5,2.0,2.5,3.0
+          return Number.isInteger(val) ? String(val) : undefined;
+        }}
       />
     </div>
   );
