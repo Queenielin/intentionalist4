@@ -118,62 +118,6 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
           ))}
         </div>
       </div>
-
-      {/* 24-hour Daily Bar */}
-      <div className="mt-6">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-gray-700">Daily Commitment</h3>
-          <span className="text-xs text-gray-500">{totalCommittedHours}/24 hours</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-          {/* Focus Time Bar */}
-          {commitments.focusTime > 0 && (
-            <div 
-              className="h-full bg-blue-400 bg-opacity-60 float-left transition-all duration-300"
-              style={{ width: `${(commitments.focusTime / 24) * 100}%` }}
-              title={`Focus Time: ${commitments.focusTime}hr`}
-            />
-          )}
-          {/* Sleep Bar */}
-          {commitments.sleep > 0 && (
-            <div 
-              className="h-full bg-purple-400 bg-opacity-60 float-left transition-all duration-300"
-              style={{ width: `${(commitments.sleep / 24) * 100}%` }}
-              title={`Sleep: ${commitments.sleep}hr`}
-            />
-          )}
-          {/* Nutrition Bar */}
-          {commitments.nutrition > 0 && (
-            <div 
-              className="h-full bg-green-400 bg-opacity-60 float-left transition-all duration-300"
-              style={{ width: `${(commitments.nutrition / 24) * 100}%` }}
-              title={`Nutrition: ${commitments.nutrition}hr`}
-            />
-          )}
-        </div>
-        
-        {/* Legend */}
-        <div className="flex gap-4 mt-2 text-xs text-gray-600">
-          {commitments.focusTime > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-blue-400 bg-opacity-60 rounded-full"></div>
-              <span>Focus ({commitments.focusTime}h)</span>
-            </div>
-          )}
-          {commitments.sleep > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-purple-400 bg-opacity-60 rounded-full"></div>
-              <span>Sleep ({commitments.sleep}h)</span>
-            </div>
-          )}
-          {commitments.nutrition > 0 && (
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-400 bg-opacity-60 rounded-full"></div>
-              <span>Nutrition ({commitments.nutrition}h)</span>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

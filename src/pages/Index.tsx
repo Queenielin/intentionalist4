@@ -171,9 +171,69 @@ const Index = () => {
 
         {/* Planning Label */}
         {currentView === 'planning' && (
+          <>
+            {/* Daily Commitment Bar */}
+            <div className="px-6 py-4 bg-white border-b border-gray-200">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Daily Commitment</h3>
+                <span className="text-sm text-gray-500">
+                  {commitments.focusTime + commitments.sleep + commitments.nutrition}/24 hours
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden mb-3">
+                {/* Focus Time Bar */}
+                {commitments.focusTime > 0 && (
+                  <div 
+                    className="h-full bg-gradient-to-r from-[hsl(var(--deep-work))] to-[hsl(var(--deep-work))] opacity-30 float-left transition-all duration-300"
+                    style={{ width: `${(commitments.focusTime / 24) * 100}%` }}
+                    title={`Focus Time: ${commitments.focusTime}hr`}
+                  />
+                )}
+                {/* Sleep Bar */}
+                {commitments.sleep > 0 && (
+                  <div 
+                    className="h-full bg-purple-400 bg-opacity-60 float-left transition-all duration-300"
+                    style={{ width: `${(commitments.sleep / 24) * 100}%` }}
+                    title={`Sleep: ${commitments.sleep}hr`}
+                  />
+                )}
+                {/* Nutrition Bar */}
+                {commitments.nutrition > 0 && (
+                  <div 
+                    className="h-full bg-green-400 bg-opacity-60 float-left transition-all duration-300"
+                    style={{ width: `${(commitments.nutrition / 24) * 100}%` }}
+                    title={`Nutrition: ${commitments.nutrition}hr`}
+                  />
+                )}
+              </div>
+              
+              {/* Legend */}
+              <div className="flex gap-4 text-xs text-gray-600">
+                {commitments.focusTime > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-gradient-to-r from-[hsl(var(--deep-work))] to-[hsl(var(--deep-work))] opacity-30 rounded-full"></div>
+                    <span>Focus ({commitments.focusTime}h)</span>
+                  </div>
+                )}
+                {commitments.sleep > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-purple-400 bg-opacity-60 rounded-full"></div>
+                    <span>Sleep ({commitments.sleep}h)</span>
+                  </div>
+                )}
+                {commitments.nutrition > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-green-400 bg-opacity-60 rounded-full"></div>
+                    <span>Nutrition ({commitments.nutrition}h)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
           <div className="px-6 py-2 bg-white border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">Planning</h2>
           </div>
+          </>
         )}
 
         {/* Content Area */}
