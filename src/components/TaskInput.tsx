@@ -35,28 +35,28 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
   };
 
   return (
-    <div className="flex gap-4 items-start">
-      <div className="flex-1">
+    <div className="space-y-4">
+      <div>
         <Textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          rows={6}
-          className="resize-none border-2 border-primary/30 focus:border-primary text-base"
+          className="resize-none border-2 border-primary/30 focus:border-primary text-base min-h-[60px]"
           placeholder="Add your tasks here..."
         />
-        <div className="text-sm text-muted-foreground mt-2">
-          ⌘ Press Ctrl+Enter to add • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
-        </div>
       </div>
 
       <Button 
         onClick={handleSubmit} 
-        className="px-6 py-3 h-auto text-base font-medium"
+        className="w-full px-6 py-3 h-auto text-base font-medium"
         size="lg"
       >
         + Add Task
       </Button>
+      
+      <div className="text-sm text-muted-foreground">
+        ⌘ Press Ctrl+Enter to add • Add multiple tasks at once • Specify time (e.g., "1hr", "30min")
+      </div>
     </div>
   );
 }

@@ -5,13 +5,14 @@ import TaskGrid from '@/components/TaskGrid';
 import CalendarView from '@/components/CalendarView';
 import WorkloadSummary from '@/components/WorkloadSummary';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, List } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, List, LayoutGrid } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function Index() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
 
   const handleAddTask = useCallback(async (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
     // Create temporary task with loading state
@@ -117,53 +118,103 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        {/* Task Input Section */}
-        <div className="mb-8">
-          <TaskInput onAddTask={handleAddTask} />
+      <div className="flex h-screen">
+        {/* Left Sidebar - Task Input */}
+        <div className="w-80 border-r border-border bg-muted/30 p-6 overflow-y-auto">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <LayoutGrid className="w-5 h-5 text-primary" />
+              Add Tasks
+            </h2>
+            <TaskInput onAddTask={handleAddTask} />
+          </div>
+          
+          {/* Task Stats */}
+          <Card className="p-4 bg-background/50">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Remaining:</span>
+                <span className="font-medium">{remainingTasks.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Completed:</span>
+                <span className="font-medium">{completedTasks.length}</span>
+              </div>
+              <div className="flex justify-between border-t pt-2">
+                <span className="text-muted-foreground">Total:</span>
+                <span className="font-medium">{todayTasks.length}</span>
+              </div>
+            </div>
+          </Card>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="planning" className="w-full">
-          <div className="flex items-center justify-between mb-6">
-            <TabsList className="grid w-auto grid-cols-2">
-              <TabsTrigger value="planning" className="flex items-center gap-2">
-                <List className="w-4 h-4" />
-                Task Planning
-              </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Schedule View
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-medium">{remainingTasks.length} remaining</span>
-                <span className="text-muted-foreground">•</span>
-                <span className="font-medium">{completedTasks.length} completed</span>
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Header with View Toggle */}
+          <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold">
+                {currentView === 'planning' ? 'Task Planning' : 'Schedule View'}
+              </h1>
+              
+              {/* View Toggle */}
+              <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
+                <Button
+                  variant={currentView === 'planning' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCurrentView('planning')}
+                  className="flex items-center gap-2"
+                >
+                  <List className="w-4 h-4" />
+                  Planning
+                </Button>
+                <Button
+                  variant={currentView === 'schedule' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setCurrentView('schedule')}
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Schedule
+                </Button>
               </div>
             </div>
           </div>
 
-          <TabsContent value="planning" className="space-y-6">
-            {/* Workload Summary */}
-            <WorkloadSummary tasks={tasks} />
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {currentView === 'planning' ? (
+              <div className="space-y-6">
+                {/* Workload Summary */}
+                <WorkloadSummary tasks={tasks} />
 
-            {/* Today's Tasks Header */}
-            <div>
-              <h2 className="text-2xl font-bold mb-6">Today's Tasks</h2>
-              
-              {/* Task Grid */}
-              <TaskGrid
+                {/* Today's Tasks */}
+                <div>
+                  <h2 className="text-xl font-bold mb-6">Today's Tasks</h2>
+                  <TaskGrid
+                    tasks={tasks}
+                    day="today"
+                    onUpdateTask={handleUpdateTask}
+                    onDeleteTask={handleDeleteTask}
+                    onDuplicateTask={handleDuplicateTask}
+                    onCompleteTask={handleCompleteTask}
+                    onAddTask={handleAddTask}
+                  />
+                </div>
+              </div>
+            ) : (
+              <CalendarView 
                 tasks={tasks}
-                day="today"
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                onDuplicateTask={handleDuplicateTask}
-                onCompleteTask={handleCompleteTask}
-                onAddTask={handleAddTask}
+                onTaskUpdate={setTasks}
               />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
             </div>
           </TabsContent>
 
