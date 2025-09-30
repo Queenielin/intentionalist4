@@ -100,17 +100,8 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
   };
 
   /** BAR DATA **/
-  const totalCommittedHours =
-    commitments.focusTime +
-    commitments.sleep +
-    commitments.nutrition +
-    commitments.movement +
-    commitments.downtime;
-
-  const remainder = Math.max(0, 24 - totalCommittedHours);
-
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Focus Time */}
       <Section
         title="Focus Time"
@@ -160,62 +151,6 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         onClick={(h) => onUpdateCommitment('downtime', commitments.downtime === h ? 0 : h)}
         getButtonClass={getButtonClass}
       />
-
-      {/* 24h target preview bar */}
-      <div className="space-y-2">
-        <div className="relative w-full h-4 rounded-lg overflow-hidden bg-muted/30 ring-1 ring-border/50">
-          <div className="flex w-full h-full">
-            {/* Sleep (grey) */}
-            <div
-              className={`${COLORS.sleep.tint}`}
-              style={{ width: `${pct(commitments.sleep)}%` }}
-              title={`Sleep target: ${fmt(commitments.sleep)}`}
-            />
-            {/* Focus Time = deep tint (transparent) */}
-            <div
-              className={`${COLORS.deep.tint}`}
-              style={{ width: `${pct(commitments.focusTime)}%` }}
-              title={`Focus time target: ${fmt(commitments.focusTime)}`}
-            />
-            {/* Nutrition */}
-            <div
-              className={`${COLORS.nutrition.tint}`}
-              style={{ width: `${pct(commitments.nutrition)}%` }}
-              title={`Nutrition target: ${fmt(commitments.nutrition)}`}
-            />
-            {/* Movement */}
-            <div
-              className={`${COLORS.movement.tint}`}
-              style={{ width: `${pct(commitments.movement)}%` }}
-              title={`Movement target: ${fmt(commitments.movement)}`}
-            />
-            {/* Downtime */}
-            <div
-              className={`${COLORS.downtime.tint}`}
-              style={{ width: `${pct(commitments.downtime)}%` }}
-              title={`Downtime target: ${fmt(commitments.downtime)}`}
-            />
-            {/* Remainder */}
-            <div
-              className={`${COLORS.remainder.base}`}
-              style={{ width: `${pct(remainder)}%` }}
-              title={`Unallocated: ${fmt(remainder)}`}
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            Planned: {fmt(totalCommittedHours)} • Remaining: {fmt(remainder)}
-          </span>
-          <div className="flex items-center gap-4">
-            <LegendSwatch className="bg-zinc-400/40" label="Sleep" />
-            <LegendSwatch className="bg-blue-500/25" label="Focus (deep) target" />
-            <LegendSwatch className="bg-violet-500/25" label="Nutrition" />
-            <LegendSwatch className="bg-emerald-500/25" label="Movement" />
-            <LegendSwatch className="bg-sky-500/25" label="Downtime" />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

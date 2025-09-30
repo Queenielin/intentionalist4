@@ -131,6 +131,13 @@ const Index = () => {
           <TaskInput onAddTask={addTask} />
         </div>
         
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">COMMIT</h2>
+          <CommitSection 
+            commitments={commitments}
+            onUpdateCommitment={updateCommitment}
+          />
+        </div>
     
       </div>
 
@@ -160,15 +167,6 @@ const Index = () => {
               <span>Schedule</span>
             </Button>
           </div>
-        </div>
-
-        {/* Commitment segment BEFORE Task Manager / Planning */}
-        <div className="px-6 py-4 bg-white border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Commit</h2>
-          <CommitSection 
-            commitments={commitments}
-            onUpdateCommitment={updateCommitment}
-          />
         </div>
 
         {/* Planning Label */}
