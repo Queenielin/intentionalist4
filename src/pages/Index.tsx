@@ -9,10 +9,16 @@ import { parseTaskInput } from '../utils/taskAI';
 import { Button } from '../components/ui/button';
 import { Calendar, List } from 'lucide-react';
 import { toast } from 'sonner';
+import CommitSection from '../components/CommitSection';
 
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
+  const [commitments, setCommitments] = useState({
+    focusTime: 0,
+    sleep: 0,
+    nutrition: 0
+  });
 
   const addTask = async (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => {
     const hasManualDuration = duration !== undefined;
@@ -106,10 +112,25 @@ const Index = () => {
     setTasks(prev => [...prev, newTask]);
   };
 
+  const updateCommitment = (type: 'focusTime' | 'sleep' | 'nutrition', hours: number) => {
+    setCommitments(prev => ({
+      ...prev,
+      [type]: hours
+    }));
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar - Task Input */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">COMMIT</h2>
+          <CommitSection 
+            commitments={commitments}
+            onUpdateCommitment={updateCommitment}
+          />
+        </div>
+        
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Task</h2>
           <TaskInput onAddTask={addTask} />
