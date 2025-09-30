@@ -87,85 +87,227 @@ export default function TaskGrid({
   });
   return (
     <div className="space-y-8">
-      {(['deep', 'light', 'admin'] as WorkBucket[]).map((bucket) => {
-        const bucketHeader = getBucketHeader(bucket);
-        const categories = bucketGroups[bucket];
+      {/* Row 1: Deep Work */}
+      <div className="space-y-4">
+        {/* Deep Work Header */}
+        <div className={cn(
+          'p-4 rounded-lg text-center',
+          getBucketColorClass('deep')
+        )}>
+          <h3 className="text-xl font-bold text-white">
+            Deep Work
+          </h3>
+        </div>
         
-        return (
-          <div key={bucket} className="space-y-4">
-            {/* Bucket Header */}
-            <div className={cn(
-              'p-4 rounded-lg text-center',
-              bucketHeader.colorClass
-            )}>
-              <h3 className="text-xl font-bold text-white">
-                {bucketHeader.title}
-              </h3>
-            </div>
-            
-            {/* Categories Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {categories.map((category) => {
-                const colorClass = getBucketColorClass(bucket);
-                const catTasks = getTasksForCategory(category);
-                const hours = getHoursTotalForCategory(category);
+        {/* Deep Work Categories Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {bucketGroups.deep.map((category) => {
+            const colorClass = getBucketColorClass('deep');
+            const catTasks = getTasksForCategory(category);
 
-                return (
-                  <Card
-                    key={category}
-                    className={cn(
-                      'min-h-[300px] p-6 transition-all duration-200 border-0 shadow-lg',
-                      colorClass
-                    )}
-                  >
-                    <div className="space-y-4">
-                      {/* Category header */}
-                      <div className="text-center">
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <h4 className="text-lg font-bold text-white">
-                            {category}
-                          </h4>
-                          <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
-                            {catTasks.length}
-                          </Badge>
-                        </div>
-                      </div>
+            return (
+              <Card
+                key={category}
+                className={cn(
+                  'min-h-[300px] p-6 transition-all duration-200 border-0 shadow-lg',
+                  colorClass
+                )}
+              >
+                <div className="space-y-4">
+                  {/* Category header */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <h4 className="text-lg font-bold text-white">
+                        {category}
+                      </h4>
+                      <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                        {catTasks.length}
+                      </Badge>
+                    </div>
+                  </div>
 
-                      {/* Tasks */}
-                      <div className="space-y-3">
-                        {catTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            onUpdate={onUpdateTask}
-                            onDelete={onDeleteTask}
-                            onComplete={onCompleteTask}
-                          />
-                        ))}
+                  {/* Tasks */}
+                  <div className="space-y-3">
+                    {catTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onUpdate={onUpdateTask}
+                        onDelete={onDeleteTask}
+                        onComplete={onCompleteTask}
+                      />
+                    ))}
 
-                        {/* Add task input for this category */}
-                        <Input
-                          placeholder={`Add ${category.toLowerCase().split(' ')[0]} task...`}
-                          className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/60 h-10"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const title = (e.target as HTMLInputElement).value.trim();
-                              if (title) {
-                                onAddTask(title, category, 30, day);
-                                (e.target as HTMLInputElement).value = '';
-                              }
-                            }
-                          }}
-                        />
+                    {/* Add task input for this category */}
+                    <Input
+                      placeholder={`Add ${category.toLowerCase().split(' ')[0]} task...`}
+                      className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/60 h-10"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const title = (e.target as HTMLInputElement).value.trim();
+                          if (title) {
+                            onAddTask(title, category, 30, day);
+                            (e.target as HTMLInputElement).value = '';
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Row 2: Light Work and Admin Work */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Light Work Section */}
+        <div className="space-y-4">
+          {/* Light Work Header */}
+          <div className={cn(
+            'p-4 rounded-lg text-center',
+            getBucketColorClass('light')
+          )}>
+            <h3 className="text-xl font-bold text-white">
+              Light Work
+            </h3>
+          </div>
+          
+          {/* Light Work Categories Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {bucketGroups.light.map((category) => {
+              const colorClass = getBucketColorClass('light');
+              const catTasks = getTasksForCategory(category);
+
+              return (
+                <Card
+                  key={category}
+                  className={cn(
+                    'min-h-[300px] p-6 transition-all duration-200 border-0 shadow-lg',
+                    colorClass
+                  )}
+                >
+                  <div className="space-y-4">
+                    {/* Category header */}
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <h4 className="text-lg font-bold text-white">
+                          {category}
+                        </h4>
+                        <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                          {catTasks.length}
+                        </Badge>
                       </div>
                     </div>
-                  </Card>
-                );
-              })}
-            </div>
+
+                    {/* Tasks */}
+                    <div className="space-y-3">
+                      {catTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onUpdate={onUpdateTask}
+                          onDelete={onDeleteTask}
+                          onComplete={onCompleteTask}
+                        />
+                      ))}
+
+                      {/* Add task input for this category */}
+                      <Input
+                        placeholder={`Add ${category.toLowerCase().split(' ')[0]} task...`}
+                        className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/60 h-10"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const title = (e.target as HTMLInputElement).value.trim();
+                            if (title) {
+                              onAddTask(title, category, 30, day);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+
+        {/* Admin Work Section */}
+        <div className="space-y-4">
+          {/* Admin Work Header */}
+          <div className={cn(
+            'p-4 rounded-lg text-center',
+            getBucketColorClass('admin')
+          )}>
+            <h3 className="text-xl font-bold text-white">
+              Admin Work
+            </h3>
+          </div>
+          
+          {/* Admin Work Categories Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {bucketGroups.admin.map((category) => {
+              const colorClass = getBucketColorClass('admin');
+              const catTasks = getTasksForCategory(category);
+
+              return (
+                <Card
+                  key={category}
+                  className={cn(
+                    'min-h-[300px] p-6 transition-all duration-200 border-0 shadow-lg',
+                    colorClass
+                  )}
+                >
+                  <div className="space-y-4">
+                    {/* Category header */}
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2 mb-2">
+                        <h4 className="text-lg font-bold text-white">
+                          {category}
+                        </h4>
+                        <Badge variant="secondary" className="text-xs bg-white/20 text-white border-white/30">
+                          {catTasks.length}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Tasks */}
+                    <div className="space-y-3">
+                      {catTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onUpdate={onUpdateTask}
+                          onDelete={onDeleteTask}
+                          onComplete={onCompleteTask}
+                        />
+                      ))}
+
+                      {/* Add task input for this category */}
+                      <Input
+                        placeholder={`Add ${category.toLowerCase().split(' ')[0]} task...`}
+                        className="text-sm bg-white/20 border-white/30 text-white placeholder:text-white/60 h-10"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const title = (e.target as HTMLInputElement).value.trim();
+                            if (title) {
+                              onAddTask(title, category, 30, day);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
