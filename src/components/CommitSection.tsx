@@ -212,26 +212,30 @@ function FocusTimeMultiBars({
   return (
     <div className="space-y-2">
       {/* Bar 1 */}
-      <SegmentedCommitBar
-        title="Focus Time"
-        subtitle="(deep work target)"
-        value={value}                         // canonical (daily bar)
-        highlightValue={bar1Val ?? null}      // ✅ highlight by bar1 selection only
-        labelsEnabled={true}                  // labels visible
-        onChange={(h) => {
-          setBar1Val(h);
-          setBar2Val(null);
-          setBar3Val(null);
-          onChange(h);                        // total becomes bar1 value
-        }}
-        segments={segments}
-        step={step}
-        start={start1}
-        colorForIndex={colorBar1}
-        showLabelAtIndex={fullHourLabel}
-        lightDividerAt={1}
-      />
+     
+ <SegmentedCommitBar
+  title="Focus Time"
+  subtitle="(deep work target)"
+  value={value}
+  highlightValue={bar1Val ?? null}
+  labelsEnabled={true}
+  onChange={(h) => {
+    setBar1Val(h);
+    setBar2Val(null);
+    setBar3Val(null);
+    onChange(h);
+  }}
+  segments={segments}
+  step={step}
+  start={start1}
+  colorForIndex={colorBar1}
+  showLabelAtIndex={fullHourLabel}
+  lightDividerAt={1}
+  tipForEndVal={tipFocus}   // ✅ add this line
+/>
 
+
+      
       {/* Bar 2 (locked until bar1 is chosen) */}
       <SegmentedCommitBar
         value={value}
