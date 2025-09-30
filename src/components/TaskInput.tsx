@@ -1,7 +1,7 @@
 // src/components/TaskInput.tsx
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 interface TaskInputProps {
   onAddTask: (title: string, duration: number, scheduledDay?: 'today' | 'tomorrow') => void;
@@ -11,10 +11,6 @@ interface TaskInputProps {
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [value, setValue] = useState('');
-
-  // Calculate number of lines in the textarea
-  const lineCount = value.split('\n').length;
-  const displayLines = Math.max(2, lineCount + 1); // Always show one extra line
 
 // NEW: map total minutes per your rules.
 //  >10 && <20  -> 15
@@ -143,37 +139,29 @@ onAddTask(cleaned, undefined, 'today');
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="space-y-4">
       <div>
-        <textarea
+        <Textarea
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
-          rows={displayLines}
-          className={cn(
-            "w-full rounded-md border-2 border-primary/30 bg-background px-3 py-2 text-base",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-            "focus:border-primary resize-none overflow-hidden",
-            "disabled:cursor-not-allowed disabled:opacity-50"
-          )}
+          className="resize-none border-2 border-primary/30 focus:border-primary text-base min-h-[60px] max-h-[120px] overflow-y-auto"
           placeholder="Add your tasks here..."
         />
       </div>
 
-      <div className="mt-auto space-y-4 sticky bottom-0 bg-white pt-4">
-        <Button 
-          onClick={handleSubmit} 
-          className="w-full px-6 py-3 h-auto text-base font-medium bg-primary"
-          size="lg"
-        >
-          + Add Task
-        </Button>
-        
-        <div className="text-sm text-muted-foreground bg-white p-2 rounded">
-          ➕ Add multiple tasks at once<br/>
-          ⏱ Specify time (e.g., 1hr, 30min, 30m)<br/>
-          ⌘ Press Ctrl+Enter to input tasks<br/>
-        </div>
+      <Button 
+        onClick={handleSubmit} 
+        className="w-full px-6 py-3 h-auto text-base font-medium sticky bottom-0 bg-primary"
+        size="lg"
+      >
+        + Add Task
+      </Button>
+      
+      <div className="text-sm text-muted-foreground sticky bottom-12 bg-white p-2 rounded">
+        ➕ Add multiple tasks at once<br/>
+        ⏱ Specify time (e.g., 1hr, 30min, 30m)<br/>
+        ⌘ Press Ctrl+Enter to input tasks<br/>
       </div>
     </div>
   );
