@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
 interface TaskInputProps {
-  onAddTask: (title: string, duration: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
+  onAddTask: (title: string, duration?: 15 | 30 | 60, scheduledDay?: 'today' | 'tomorrow') => void;
 }
+
 
 export default function TaskInput({ onAddTask }: TaskInputProps) {
   const [value, setValue] = useState('');
@@ -120,8 +121,9 @@ export default function TaskInput({ onAddTask }: TaskInputProps) {
       }
     }
 
-    // Fallback: no duration parsed → keep original behavior
-    onAddTask(cleaned, 30, 'today');
+// No duration parsed → let taskAI (edge) decide by omitting duration
+onAddTask(cleaned, undefined, 'today');
+
   }, [onAddTask]);
 
   const handleSubmit = useCallback(() => {
