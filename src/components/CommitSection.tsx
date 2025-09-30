@@ -128,37 +128,40 @@ function SegmentedCommitBar({
               ? 'border-l border-l-gray-200'
               : 'border-l border-l-gray-300';
 
-          const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
-          const tip = tipForEndVal ? tipForEndVal(endVal) : `${endVal} hours`;
+         const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
+const tip = tipForEndVal ? tipForEndVal(endVal) : ''; // no default hour text
 
-          const Square = (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onChange(endVal)}
-              title={`${endVal} hours`}
-              className={cn(
-                'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
-                bg, fg, divider,
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
-              )}
-              aria-pressed={active}
-            >
-              {label ? <span className="pointer-events-none">{label}</span> : null}
-            </button>
-          );
+const Square = (
+  <button
+    key={idx}
+    type="button"
+    onClick={() => onChange(endVal)}
+    /* removed title attr to avoid native tooltip */
+    className={cn(
+      'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
+      bg, fg, divider,
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
+    )}
+    aria-pressed={active}
+  >
+    {label ? (
+      <span className="pointer-events-none select-none">{label}</span>
+    ) : null}
+  </button>
+);
 
-          return tipForEndVal ? (
-            <Tooltip key={idx}>
-              <TooltipTrigger asChild>{Square}</TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs text-xs leading-snug">
-                <div className="font-medium mb-0.5">{endVal}h</div>
-                <div>{tip}</div>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            Square
-          );
+return tipForEndVal ? (
+  <Tooltip key={idx}>
+    <TooltipTrigger asChild>{Square}</TooltipTrigger>
+    <TooltipContent side="top" sideOffset={6} className="max-w-xs text-xs leading-snug">
+      {/* removed the endVal header; show only the tip text */}
+      {tip}
+    </TooltipContent>
+  </Tooltip>
+) : (
+  Square
+);
+
         })}
       </div>
     </div>
