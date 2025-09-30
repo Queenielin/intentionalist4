@@ -22,79 +22,48 @@ interface CommitSectionProps {
   ) => void;
 }
 
-/* ---------- TIP HELPERS (content varies by bar & value) ---------- */
-
 function tipFocus(endVal: number) {
-  if (endVal >= 5.5) {
-    return '≥5.5h deep work: high fatigue risk; quality/creativity often drop after prolonged focus.';
-  }
-  if (endVal >= 5.0) {
-    return '≈5h is near the practical upper bound for most; schedule recovery and breaks.';
-  }
-  if (endVal >= 4.0) {
-    return '3–4h: sweet spot for sustained deep work for many knowledge workers.';
-  }
-  if (endVal >= 2.0) {
-    return '2–3h: solid daily focus block; consider protecting it from interruptions.';
-  }
-  return 'Short focus blocks help momentum; aim to build toward 2–4h on key days.';
+  if (endVal >= 5.5) return '≥5.5h: fatigue risk; quality tends to drop after prolonged focus.';
+  if (endVal >= 5.0) return '≈5h: near upper bound for most; plan breaks and recovery.';
+  if (endVal >= 4.0) return '3–4h: sweet spot for sustained deep work for many.';
+  if (endVal >= 2.0) return '2–3h: solid daily focus block; protect from interruptions.';
+  return 'Build momentum with shorter blocks; aim toward 2–4h on key days.';
 }
 
 function tipSleep(endVal: number) {
-  if (endVal >= 7 && endVal <= 9) {
-    return '7–9h supports memory, mood, reaction time, and long-term health.';
-  }
-  if (endVal === 6.5) {
-    return '6.5h: borderline—many feel next-day dips in attention and impulse control.';
-  }
-  if (endVal <= 6) {
-    return '≤6h: higher risk of cognitive impairment and error rates; extend if possible.';
-  }
-  return 'Approaching the recommended 7–9h range improves recovery and learning.';
+  if (endVal >= 7 && endVal <= 9) return '7–9h supports memory, mood, reaction time, and long-term health.';
+  if (endVal === 6.5) return '6.5h: borderline—many see dips in attention and impulse control.';
+  if (endVal <= 6) return '≤6h: higher risk of cognitive impairment and errors; extend if possible.';
+  return 'Approaching the 7–9h range improves recovery and learning.';
 }
 
 function tipNutrition(endVal: number) {
-  if (endVal >= 1 && endVal <= 3) {
-    return '1–3h relaxed meal time aids energy stability and reduces decision fatigue.';
-  }
-  if (endVal === 1.0) {
-    return '≈1h: minimum viable mealtime; plan protein/fiber to avoid crashes.';
-  }
-  if (endVal === 0.5) {
-    return '0.5h: rushed meals can worsen glycemic swings; add time if you can.';
-  }
-  return 'More time for meals can help mindful eating and steadier energy.';
+  if (endVal >= 1 && endVal <= 3) return '1–3h relaxed meals aid energy stability and reduce decision fatigue.';
+  if (endVal === 1.0) return '≈1h: minimal mealtime—prioritize protein/fiber to avoid crashes.';
+  if (endVal === 0.5) return '0.5h: rushed meals can worsen glycemic swings; add time if possible.';
+  return 'Mindful, unhurried meals tend to support steadier energy.';
 }
 
 function tipMovement(endVal: number) {
-  if (endVal >= 1 && endVal <= 4) {
-    return 'Daily movement supports mood, sleep, and cognition (target 150–300 min/week).';
-  }
-  if (endVal === 0.5) {
-    return 'Even 30 minutes improves mood and alertness—great start.';
-  }
-  return 'Higher totals can be fine if intensity is moderate and recovery is adequate.';
+  if (endVal === 0.5) return 'Even 30 minutes boosts mood and alertness—great start.';
+  if (endVal >= 1 && endVal <= 4) return 'Regular movement supports mood, sleep, and cognition (≈150–300 min/week).';
+  return 'Higher totals can work if intensity is moderate and recovery adequate.';
 }
 
 function tipDowntime(endVal: number) {
-  if (endVal >= 1 && endVal <= 2) {
-    return '1–2h daily downtime helps stress offloading and sustained motivation.';
-  }
-  if (endVal === 0.5) {
-    return 'Minimal downtime—consider brief decompression to prevent stress carryover.';
-  }
-  if (endVal > 2.5) {
-    return 'Extended downtime can be restorative if it doesn’t crowd out priorities.';
-  }
-  return 'Aim for consistent daily recovery to protect sleep and focus quality.';
+  if (endVal >= 1 && endVal <= 2) return '1–2h daily downtime helps stress offloading and sustained motivation.';
+  if (endVal === 0.5) return 'Minimal downtime—brief decompression reduces stress carryover.';
+  if (endVal > 2.5) return 'Extended downtime can restore well-being if it fits your day.';
+  return 'Consistent recovery protects sleep and focus quality.';
 }
+
 
 function SegmentedCommitBar({
   title,
   subtitle,
   value,
-  highlightValue,          // ✅ new: what to use for highlighting (defaults to value)
-  labelsEnabled = true,    // ✅ new: whether to render numbers on squares
+  highlightValue,          // keeps your per-bar highlight logic
+  labelsEnabled = true,
   onChange,
   segments,
   step = 0.5,
@@ -103,12 +72,13 @@ function SegmentedCommitBar({
   showLabelAtIndex,
   lightDividerAt,
   disabled = false,
+  tipForEndVal,            // ✅ NEW/RESTORED: per-square tooltip content
 }: {
   title?: string;
   subtitle?: string;
-  value: number;                         // total/canonical value
-  highlightValue?: number | null;        // ✅ which value controls the filled squares for THIS bar
-  labelsEnabled?: boolean;               // ✅ whether to show labels on this bar
+  value: number;
+  highlightValue?: number | null;
+  labelsEnabled?: boolean;
   onChange: (h: number) => void;
   segments: number;
   step?: number;
@@ -117,9 +87,10 @@ function SegmentedCommitBar({
   showLabelAtIndex?: (idx: number, endVal: number) => string | undefined;
   lightDividerAt?: number;
   disabled?: boolean;
+  tipForEndVal?: (endVal: number) => string;  // ✅
 }) {
-  const basis = highlightValue ?? value; // ✅ use bar-specific selection when provided
-  const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1); // -1 => none
+  const basis = highlightValue ?? value;
+  const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
 
   return (
     <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
@@ -157,10 +128,10 @@ function SegmentedCommitBar({
               ? 'border-l border-l-gray-200'
               : 'border-l border-l-gray-300';
 
-          const label =
-            labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
+          const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
+          const tip = tipForEndVal ? tipForEndVal(endVal) : `${endVal} hours`;
 
-          return (
+          const Square = (
             <button
               key={idx}
               type="button"
@@ -168,15 +139,25 @@ function SegmentedCommitBar({
               title={`${endVal} hours`}
               className={cn(
                 'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
-                bg,
-                fg,
-                divider,
+                bg, fg, divider,
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
               )}
               aria-pressed={active}
             >
               {label ? <span className="pointer-events-none">{label}</span> : null}
             </button>
+          );
+
+          return tipForEndVal ? (
+            <Tooltip key={idx}>
+              <TooltipTrigger asChild>{Square}</TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs leading-snug">
+                <div className="font-medium mb-0.5">{endVal}h</div>
+                <div>{tip}</div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            Square
           );
         })}
       </div>
