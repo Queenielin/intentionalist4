@@ -125,19 +125,22 @@ const Index = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Left Sidebar - Task Input */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Task</h2>
-          <TaskInput onAddTask={addTask} />
-        </div>
-        
-        <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">COMMIT</h2>
           <CommitSection 
             commitments={commitments}
             onUpdateCommitment={updateCommitment}
           />
         </div>
+      
+      
+      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Task</h2>
+          <TaskInput onAddTask={addTask} />
+        </div>
+        
+       
     
       </div>
 
