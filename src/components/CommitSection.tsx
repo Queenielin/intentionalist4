@@ -337,6 +337,67 @@ function FocusTimeMultiBars({
 
 /* ---------- MAIN COMPONENT ---------- */
 
+// ADDED: DailyCommitmentBar (24 squares)
+function DailyCommitmentBar({
+  blocks,
+}: {
+  // blocks = array of allocations with color class and hours length
+  // e.g., [{ key: 'sleep', hours: 8.5, color: 'green' }, ...]
+  blocks: Array<{ key: string; hours: number; color: 'green' | 'orange' | 'red' }>;
+}) {
+  const totalCells = 24;
+  // Build a flat array of 24 cells, each empty by default
+  const cells: Array<{ filled: boolean; half: boolean; color?: 'green' | 'orange' | 'red' }> =
+    Array.from({ length: totalCells }, () => ({ filled: false, half: false }));
+
+  // Fill cells in order of blocks; you can change stacking logic later
+  let cursor = 0;
+  for (const b of blocks) {
+    const whole = Math.floor(b.hours);
+    const frac = b.hours - whole;
+
+    for (let i = 0; i < whole && cursor < totalCells; i++, cursor++) {
+      cells[cursor] = { filled: true, half: false, color: b.color };
+    }
+    if (frac >= 0.5 && cursor < totalCells) {
+      cells[cursor] = { filled: true, half: true, color: b.color };
+      cursor++;
+    }
+  }
+
+  const toneToBg = (tone?: 'green' | 'orange' | 'red', half?: boolean) => {
+    if (!tone) return 'bg-transparent';
+    if (half) {
+      // half-fill by overlaying a half-width inner bar; base keeps a light background of the same tone
+      return tone === 'green'
+        ? 'bg-green-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-green-500'
+        : tone === 'orange'
+        ? 'bg-orange-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-orange-500'
+        : 'bg-red-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-red-500';
+    }
+    return tone === 'green'
+      ? 'bg-green-500'
+      : tone === 'orange'
+      ? 'bg-orange-500'
+      : 'bg-red-500';
+  };
+
+  return (
+    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
+      {cells.map((c, i) => (
+        <div
+          key={i}
+          className={cn(
+            'h-8 w-8 border border-gray-300',
+            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
+          )}
+          title={`${i}:00`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
   return (
     <div className="space-y-4">
@@ -411,6 +472,24 @@ defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
         defaultValue={DEFAULT_COMMITMENTS.downtime} // <-- ADDED on the first Focus bar
 
       />
+
+      {/* ADDED: Daily Commitment (24 squares, same tones) */}
+      <div>
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Daily Commitment</h3>
+        <DailyCommitmentBar
+          blocks={[
+            // CHANGED/CONFIG: map per-category to a tone you want to reuse
+            { key: 'focusTime', hours: commitments.focusTime, color: 'orange' }, // e.g., focus = orange
+            { key: 'sleep', hours: commitments.sleep, color: 'green' },         // sleep = green
+            { key: 'nutrition', hours: commitments.nutrition, color: 'green' }, // meals = green (or orange)
+            { key: 'movement', hours: commitments.movement, color: 'green' },   // movement = green
+            { key: 'downtime', hours: commitments.downtime, color: 'red' },     // downtime = red (or orange/green by policy)
+          ]}
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Uncommitted time shows as empty boxes.
+        </p>
+      </div>
     </div>
   );
 }
