@@ -137,7 +137,7 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
           return (
           
             
-          // CHANGED: header row (title + hour), bar below
+            {*/ CHANGED: header row (title + hour), bar below*/}
 <div key={commitment.id} className="space-y-2">
   <div className="flex items-baseline justify-between">
     <h3 className="font-medium text-gray-700">{commitment.name}</h3>
