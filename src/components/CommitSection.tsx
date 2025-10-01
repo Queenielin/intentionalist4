@@ -421,18 +421,6 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
       {/* ADDED: Daily Commitment (24 squares, same tones) */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Daily Commitment</h3>
-
-
-
-<DailyCommitmentSidebarBar
-  focusHours={commitments.focusTime}
-  sleepHours={commitments.sleep}
-  nutritionHours={commitments.nutrition}
-  movementHours={commitments.movement}
-  downtimeHours={commitments.downtime}
-/>
-
-
         
         <p className="mt-1 text-xs text-muted-foreground">
           Uncommitted time shows as empty boxes.
