@@ -166,7 +166,8 @@ className={cn(
 
 
     
-    onClick={() => onChange(endVal)}
+  onClick={() => onChange(max !== undefined ? Math.min(endVal, max) : endVal)}
+    
   >
     {showLabel}
   </div>
