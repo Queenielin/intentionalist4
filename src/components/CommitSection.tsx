@@ -120,7 +120,7 @@ const getUnselectedColor = (value: number, type: string) => {
 /* ---------- segmented bar ---------- */
 
 
-const CELL_STEP = 0.5; // each cell = 0.5 hr
+
 
 type Tone = 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
 
