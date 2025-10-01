@@ -27,11 +27,9 @@ const Index = () => {
     const newTask: Task = {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
-      category: 'Social & Relational', 
-      {/* Default category while AI processes*/}
-
+      category: 'Social & Relational', // Default category while AI processes
       
-      duration: duration || 30,  {/* Default to 30 if not provided*/}
+      duration: duration || 30,  // Default to 30 if not provided
       completed: false,
       slotId: '',
       scheduledDay: scheduledDay || 'today',
@@ -41,8 +39,7 @@ const Index = () => {
 
     setTasks(prev => [...prev, newTask]);
 
-    {/*  Call the actual edge function for categorization*/}
-  
+    // Call the actual edge function for categorization
     try {
       const { data, error } = await supabase.functions.invoke('categorize-tasks', {
         body: {
@@ -68,15 +65,14 @@ const Index = () => {
                 category: classification.category,
                 title: classification.title, 
               
-              {/* Use cleaned title from AI */}
-               
+                // Use cleaned title from AI
               
               duration: hasManualDuration ? (duration || 30) : classification.duration
               } 
             : t
         ));
       } else {
-       {/*  Fallback if no classification returned */}
+        // Fallback if no classification returned
         setTasks(prev => prev.map(t => 
           t.id === newTask.id 
             ? { ...t, isCategorizing: false } 
@@ -85,7 +81,7 @@ const Index = () => {
       }
     } catch (error) {
       console.error('Error calling categorization function:', error);
-      {*/ Fallback on error*/}
+      // Fallback on error
       setTasks(prev => prev.map(t => 
         t.id === newTask.id 
           ? { ...t, isCategorizing: false } 
