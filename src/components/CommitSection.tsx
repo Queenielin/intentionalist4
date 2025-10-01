@@ -157,8 +157,8 @@ className={cn(
 
 
  // No per-cell borders; equal-sized grid cells; box-border avoids layout weirdness
-+             'h-6 w-full box-border flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-+             'rounded-none',
+'h-6 w-full box-border flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
+     'rounded-none',
   
   active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
   active && 'font-bold'
