@@ -187,10 +187,22 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
 
 
         {commitments.map((commitment) => {
-  const startForBar = commitment.id === 'sleep' ? 4 : 0; // sleep starts at 4h; others at 0h
-  const segments = Math.floor((commitment.max - startForBar) / commitment.step) + 1; // include first cell
-  const selectedIdx = Math.max(0, Math.round((commitment.value - startForBar) / commitment.step));
+  
+        
+  
+const startForBar = commitment.id === 'sleep' ? 4 : 0; // keep your sleep start at 4h
+        
+ const segments = FIXED_SEGMENTS; // always 12
+// derive a dynamic step so 12 cells span start→max (12 points => 11 intervals)
 
+        const derivedStep = (commitment.max - startForBar) / (segments - 1);
+        
+ const selectedIdx = Math.max(0, Math.min(
+ segments - 1,
+ Math.round((commitment.value - startForBar) / derivedStep)
+));
+
+        
   return (
     <div key={commitment.id} className="space-y-1"> {/* half the previous spacing */}
       <div className="flex items-baseline justify-between">
