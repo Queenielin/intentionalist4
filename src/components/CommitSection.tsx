@@ -54,12 +54,12 @@ const getBorderColor = (tone: string) => {
 const getRecommendationColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
     if (value >= 2 && value <= 4) return 'bg-green-600';
-    if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-600';
+    if ((value >= 1 && value < 2) || (value > 4 && value <= 5)) return 'bg-orange-600';
     return 'bg-red-600';
   }
 
   if (type === 'Sleep') {
-    if (value >= 7 && value <= 9) return 'bg-green-600';
+    if (value >= 7 && value <= 8) return 'bg-green-600';
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-600';
     return 'bg-red-600';
   }
@@ -87,12 +87,12 @@ const getRecommendationColor = (value: number, type: string) => {
 const getUnselectedColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
     if (value >= 2 && value <= 4) return 'bg-green-200';
-    if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-200';
+    if ((value >= 1 && value < 2) || (value > 4 && value <= 5)) return 'bg-orange-200';
     return 'bg-red-200';
   }
 
   if (type === 'Sleep') {
-    if (value >= 7 && value <= 9) return 'bg-green-200';
+    if (value >= 7 && value <= 8) return 'bg-green-200';
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-200';
     return 'bg-red-200';
   }
