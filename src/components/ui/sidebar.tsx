@@ -19,6 +19,61 @@ const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
+
+type BarKind = 'sleep' | 'focusTime' | 'movement' | 'nutrition' | 'downtime';
+
+const normalizeHalfHour = (v: number) => Math.round(v * 2) / 2;
+
+function getTooltipMessage(kind: BarKind, rawVal: number): string {
+  const v = normalizeHalfHour(rawVal);
+
+  switch (kind) {
+    case 'sleep': {
+      if (v >= 4 && v <= 5.5) return 'Short sleep (4–5.5h): likely not enough recovery.';
+      if (v >= 6 && v <= 8)   return 'Healthy range (6–8h) for most adults.';
+      if (v >= 8.5 && v <= 9) return 'High end (8.5–9h): watch grogginess.';
+      if (v === 9.5)          return 'Very long night (9.5h): quality > quantity.';
+      break;
+    }
+
+    case 'focusTime': {
+      if (v >= 0 && v <= 1.5) return 'Light focus (≤1.5h): quick wins & admin.';
+      if (v >= 2 && v <= 3.5) return 'Solid focus (2–3.5h): good deep work blocks.';
+      if (v >= 4 && v <= 5)   return 'Marathon focus (4–5h): plan breaks.';
+      if (v === 5.5)          return 'Max focus (5.5h): protect energy.';
+      break;
+    }
+
+    case 'movement': {
+      if (v >= 0 && v <= 0.5) return 'Minimal activity (≤30m).';
+      if (v >= 1 && v <= 2)   return 'Good baseline (1–2h): steady movement.';
+      if (v >= 2.5 && v <= 4) return 'Active day (2.5–4h): recover well.';
+      if (v >= 4.5 && v <= 5.5) return 'High volume (4.5–5.5h): watch fatigue.';
+      break;
+    }
+
+    case 'nutrition': {
+      if (v >= 0 && v <= 0.5) return 'Quick/low-prep meals.';
+      if (v >= 1 && v <= 2)   return 'Balanced prep time (1–2h).';
+      if (v >= 2.5 && v <= 4) return 'Cooking-heavy day (2.5–4h).';
+      if (v >= 4.5 && v <= 5.5) return 'Time-intensive food planning.';
+      break;
+    }
+
+    case 'downtime': {
+      if (v >= 0 && v <= 0.5) return 'Minimal downtime—micro breaks only.';
+      if (v >= 1 && v <= 2)   return 'Healthy recharge (1–2h).';
+      if (v >= 2.5 && v <= 4) return 'Extended leisure (2.5–4h).';
+      if (v >= 4.5 && v <= 5.5) return 'Heavy unwind—protect sleep.';
+      break;
+    }
+  }
+
+  // Fallback (always show something)
+  return 'Adjust to your needs.';
+}
+
+
 type SidebarContext = {
   state: "expanded" | "collapsed";
   open: boolean;
