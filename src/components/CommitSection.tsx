@@ -49,11 +49,15 @@ const getRecommendationColor = (value: number, type: string) => {
     if (value >= 0.5) return 'bg-green-600';
     return 'bg-red-600';
   }
+
+  
   if (type === 'Nutrition') {
     if (value >= 1 && value <= 3) return 'bg-green-600';
     if (value > 3 && value < 5) return 'bg-orange-600'; // FIX: removed extra ')', adjusted threshold
     return 'bg-red-600';
   }
+
+  
   if (type === 'Downtime') {
     if (value >= 1 && value <= 2) return 'bg-green-600';
     if (value > 2 && value <= 3) return 'bg-orange-600'; // FIX: added missing ')', defined upper bound
@@ -64,34 +68,39 @@ const getRecommendationColor = (value: number, type: string) => {
 
 
 
-const getUnselectedColor = (value: number, type: string) => {
+const getUnselectedColor =  (value: number, type: string) => {
   if (type === 'Focus Time') {
     if (value >= 2 && value <= 4) return 'bg-green-200';
     if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-200';
     return 'bg-red-200';
   }
+ 
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-200';
-    if ((value >= 6 && value < 7) || (value > 9 && value <= 10)) return 'bg-orange-200';
+    if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-200';
     return 'bg-red-200';
   }
+
   if (type === 'Movement') {
-    if (value >= 1 && value <= 2) return 'bg-green-200';
-    if ((value >= 0.5 && value < 1) || (value > 2 && value <= 3)) return 'bg-orange-200';
+    if (value >= 0.5) return 'bg-green-200';
     return 'bg-red-200';
   }
+
   if (type === 'Nutrition') {
-    if (value >= 3 && value <= 5) return 'bg-green-200';
-    if ((value >= 2 && value < 3) || (value > 5 && value <= 6)) return 'bg-orange-200';
-    return 'bg-red-200';
-  }
-  if (type === 'Downtime') {
     if (value >= 1 && value <= 3) return 'bg-green-200';
-    if ((value >= 0.5 && value < 1) || (value > 3 && value <= 4)) return 'bg-orange-200';
+    if (value > 3 && value < 5) return 'bg-orange-200';
     return 'bg-red-200';
   }
+
+  if (type === 'Downtime') {
+    if (value >= 1 && value <= 2) return 'bg-green-200';
+    if (value > 2 && value <= 3) return 'bg-orange-200';
+    return 'bg-red-200';
+  }
+
   return 'bg-gray-200';
 };
+
 
 const SegmentedCommitBar: React.FC<{
   segments: number;
