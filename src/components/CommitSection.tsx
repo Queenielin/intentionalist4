@@ -35,23 +35,25 @@ const getRecommendationColor = (value: number, type: string) => {
   }
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-600';
-    if ((value >= 6 && value < 7) || (value > 9 && value <= 10)) return 'bg-orange-600';
+    if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-600';
     return 'bg-red-600';
   }
   if (type === 'Movement') {
-    if (value >= 1 && value <= 2) return 'bg-green-600';
-    if ((value >= 0.5 && value < 1) || (value > 2 && value <= 3)) return 'bg-orange-600';
+    if (value >= 0.5 ) return 'bg-green-600';
+    
+  
+    
     return 'bg-red-600';
   }
   if (type === 'Nutrition') {
-    if (value >= 3 && value <= 5) return 'bg-green-600';
-    if ((value >= 2 && value < 3) || (value > 5 && value <= 6)) return 'bg-orange-600';
+    if (value >= 1 && value <= 3) return 'bg-green-600';
+    if (value > 3.5 && value < 5) ) return 'bg-orange-600';
     return 'bg-red-600';
   }
   
   if (type === 'Downtime') {
-    if (value >= 1 && value <= 3) return 'bg-green-600';
-    if ((value >= 0.5 && value < 1) || (value > 3 && value <= 4)) return 'bg-orange-600';
+    if (value >= 1 && value <= 2) return 'bg-green-600';
+    if ((value > 2 ) return 'bg-orange-600';
     return 'bg-red-600';
   }
   
