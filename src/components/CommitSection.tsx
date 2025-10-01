@@ -31,27 +31,8 @@ const DEFAULT_COMMITMENTS = {
 };
 
 const toneClasses = (tone: 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'teal' | 'indigo', active: boolean) => {
-  // Square fill colors: green/orange/red based on research recommendations
-  const bg = active
-    ? tone === 'red' ? 'bg-red-500'
-      : tone === 'orange' ? 'bg-orange-500'
-      : 'bg-green-500'
-    : tone === 'red' ? 'bg-red-100'
-      : tone === 'orange' ? 'bg-orange-100'
-      : 'bg-green-100';
-
-  // Border colors: unique ID color for each commitment type
-  const borderColor = tone === 'blue' ? 'border-blue-600'
-    : tone === 'purple' ? 'border-purple-600'
-    : tone === 'teal' ? 'border-teal-600'
-    : tone === 'indigo' ? 'border-indigo-600'
-    : tone === 'red' ? 'border-red-600'
-    : tone === 'orange' ? 'border-orange-600'
-    : 'border-green-600';
-
   const fg = active ? 'text-white' : 'text-gray-700';
-
-  return `${bg} ${fg} border-2 ${borderColor}`;
+  return `${fg}`;
 };
 
 function tipFocus(endVal: number) {
@@ -106,6 +87,7 @@ function SegmentedCommitBar({
   disabled = false,
   tipForEndVal,            // ✅ NEW/RESTORED: per-square tooltip content
   defaultValue,
+  uniqueColor, // New prop for the unique border color
 }: {
 
   title?: string;
@@ -126,6 +108,7 @@ colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green' | 'bl
   disabled?: boolean;
   tipForEndVal?: (endVal: number) => string;  // ✅
   defaultValue?: number;
+  uniqueColor: 'blue' | 'purple' | 'teal' | 'indigo' | 'green';
   
 }) {
 
@@ -140,6 +123,30 @@ const basis = highlightValue ?? value ?? defaultValue ?? start; // <-- added "??
   
   const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
 
+  // Helper function to get border color based on unique color
+  const getBorderColor = (color: 'blue' | 'purple' | 'teal' | 'indigo' | 'green') => {
+    switch (color) {
+      case 'blue': return 'border-blue-600';
+      case 'purple': return 'border-purple-600';
+      case 'teal': return 'border-teal-600';
+      case 'indigo': return 'border-indigo-600';
+      case 'green': return 'border-green-600';
+      default: return 'border-gray-600';
+    }
+  };
+
+  // Helper function to get fill color based on research recommendation
+  const getFillColor = (tone: 'red' | 'orange' | 'green', active: boolean) => {
+    if (active) {
+      return tone === 'red' ? 'bg-red-500' 
+           : tone === 'orange' ? 'bg-orange-500' 
+           : 'bg-green-500';
+    } else {
+      return tone === 'red' ? 'bg-red-200' 
+           : tone === 'orange' ? 'bg-orange-200' 
+           : 'bg-green-200';
+    }
+  };
 
   return (
     <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
@@ -149,18 +156,17 @@ const basis = highlightValue ?? value ?? defaultValue ?? start; // <-- added "??
         </h3>
       ) : null}
 
-      <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
+      <div className={cn(
+        "inline-flex rounded-md shadow-sm overflow-hidden select-none",
+        getBorderColor(uniqueColor),
+        "border-2"
+      )}>
         {Array.from({ length: segments }).map((_, idx) => {
           const endVal = start + (idx + 1) * step;
           const tone = colorForIndex(idx, endVal);
           const active = idx === selectedIdx;
 
-          const baseDivider =
-            idx === 0
-              ? ''
-              : idx === lightDividerAt
-              ? 'border-l border-l-gray-200'
-              : 'border-l border-l-gray-300';
+          const divider = idx === 0 ? '' : 'border-l border-l-white/30';
 
           const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
           const tip = tipForEndVal ? tipForEndVal(endVal) : '';
@@ -171,9 +177,10 @@ const basis = highlightValue ?? value ?? defaultValue ?? start; // <-- added "??
               type="button"
               onClick={() => onChange(endVal)}
               className={cn(
-                'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
+                'relative h-6 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
+                getFillColor(tone as 'red' | 'orange' | 'green', active),
                 toneClasses(tone, active),
-                baseDivider,
+                divider,
                 active && 'font-bold',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
               )}
@@ -269,6 +276,7 @@ function FocusTimeMultiBars({
   tipForEndVal={tipFocus}   // ✅ add this line
    // ADD this prop to the Focus Time bar
         defaultValue={DEFAULT_COMMITMENTS.focusTime}
+        uniqueColor="blue"
 
 />
 
@@ -291,6 +299,7 @@ function FocusTimeMultiBars({
         colorForIndex={(_idx) => 'green'} // Focus Time uses green squares
         showLabelAtIndex={fullHourLabel}
         disabled={start2 == null}
+        uniqueColor="blue"
       />
 
       {/* Bar 3 (locked until bar2 is chosen) */}
@@ -309,6 +318,7 @@ function FocusTimeMultiBars({
         colorForIndex={(_idx) => 'green'} // Focus Time uses green squares
         showLabelAtIndex={fullHourLabel}
         disabled={start3 == null}
+        uniqueColor="blue"
       />
     </div>
   );
@@ -342,6 +352,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipSleep}
         defaultValue={DEFAULT_COMMITMENTS.sleep}
+        uniqueColor="blue"
 
       />
 
@@ -359,6 +370,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipNutrition}
         defaultValue={DEFAULT_COMMITMENTS.nutrition}
+        uniqueColor="purple"
 
       />
 
@@ -375,6 +387,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipMovement}
         defaultValue={DEFAULT_COMMITMENTS.movement}
+        uniqueColor="teal"
 
       />
 
@@ -391,6 +404,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipDowntime}
         defaultValue={DEFAULT_COMMITMENTS.downtime}
+        uniqueColor="indigo"
 
       />
 
