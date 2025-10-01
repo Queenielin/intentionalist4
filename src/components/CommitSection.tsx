@@ -131,6 +131,7 @@ const defaultIdx = defaultValue !== undefined
         {Array.from({ length: segments }).map((_, idx) => {
           const endVal = start + (idx + 1) * step;
           const tone = colorForIndex(idx, endVal);
+          const active = idx === selectedIdx;
 
           const solidTone =
             tone === 'red'
@@ -165,7 +166,40 @@ const defaultIdx = defaultValue !== undefined
               onClick={() => onChange(endVal)}
               className={cn(
                 'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
-                appliedTone,
+              : tone === 'red'
+              ? 'bg-red-100'
+              : tone === 'orange'
+              ? 'bg-orange-100'
+              : tone === 'green'
+              ? 'bg-green-100'
+              : tone === 'blue'
+              ? 'bg-blue-100'
+              : tone === 'purple'
+              ? 'bg-purple-100'
+              : tone === 'teal'
+              ? 'bg-teal-100'
+              : 'bg-indigo-100';
+
+            const fg = active
+              ? 'text-white'
+              : tone === 'red'
+              ? 'text-red-700'
+              : tone === 'orange'
+              ? 'text-orange-700'
+              : tone === 'green'
+              ? 'text-green-700'
+              : tone === 'blue'
+              ? 'text-blue-700'
+              : tone === 'purple'
+              ? 'text-purple-700'
+              : tone === 'teal'
+              ? 'text-teal-700'
+              : 'text-indigo-700';
+
+            return `${bg} ${fg}`;
+          };
+
+                toneClasses(tone, active),
                 baseDivider,
                 active && 'font-bold',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
@@ -191,71 +225,6 @@ const defaultIdx = defaultValue !== undefined
             Square
           );
         })}
-            tone === 'red'
-              ? active ? 'bg-red-500' : 'bg-red-100'
-              : tone === 'orange'
-              ? active ? 'bg-orange-500' : 'bg-orange-100'
-              : active ? 'bg-green-600' : 'bg-green-100';
-
-          const fg = active
-            ? 'text-white'
-            : tone === 'red'
-            ? 'text-red-700'
-            : tone === 'orange'
-            ? 'text-orange-700'
-            : 'text-green-700';
-
-          const divider =
-            idx === 0
-              ? ''
-              : idx === lightDividerAt
-              ? 'border-l border-l-gray-200'
-              : 'border-l border-l-gray-300';
-
-         const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
-const tip = tipForEndVal ? tipForEndVal(endVal) : ''; // no default hour text
-
-const Square = (
-  <button
-    key={idx}
-    type="button"
-    onClick={() => onChange(endVal)}
-    /* removed title attr to avoid native tooltip */
-    className={cn(
-      'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
-        toneClasses(tone, active),
-  baseDivider,
-  active && 'font-bold', // <-- ADDED
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
-)}
-    aria-pressed={active}
-  >
-// BEFORE:
-// {label ? <span className="pointer-events-none select-none">{label}</span> : null}
-
-// AFTER (CHANGED): if active, always show the exact endVal (e.g., 1.5); otherwise show the scheduled label (e.g., full hours)
-{active ? (
-  <span className="pointer-events-none select-none text-current">{formatHours(endVal)}</span> // <-- CHANGED
-) : label ? (
-  <span className="pointer-events-none select-none text-current">{label}</span> // <-- ADDED text-current to inherit tone
-) : null}
-
-
-    
-  </button>
-);
-
-return tipForEndVal ? (
-  <Tooltip key={idx}>
-    <TooltipTrigger asChild>{Square}</TooltipTrigger>
-    <TooltipContent side="top" sideOffset={6} className="max-w-xs text-xs leading-snug">
-      {/* removed the endVal header; show only the tip text */}
-      {tip}
-    </TooltipContent>
-  </Tooltip>
-) : (
-  Square
-);
 
         })}
       </div>
