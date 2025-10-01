@@ -35,12 +35,16 @@ const getRecommendationColor = (value: number, type: string) => {
     if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-600';
     return 'bg-red-600';
   }
+ 
+  
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-600';
     // NOTE: You may want (value >= 6 && value < 7) || (value > 9 && value <= 10) here.
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-600';
     return 'bg-red-600';
   }
+
+  
   if (type === 'Movement') {
     if (value >= 0.5) return 'bg-green-600';
     return 'bg-red-600';
