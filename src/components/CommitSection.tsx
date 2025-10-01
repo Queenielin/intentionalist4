@@ -6,7 +6,7 @@ interface Commitment {
   name: string;
   value: number;
   max: number;
-  step: number;
+  step: number; // allowed step (e.g., 0.5, 1)
   unit: string;
   borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
 }
@@ -16,15 +16,15 @@ interface CommitSectionProps {
   onUpdateCommitment: (id: string, value: number) => void;
 }
 
+/* ---------- helpers ---------- */
+
 const snapTo = (val: number, base: number) =>
   Number((Math.round(val / base) * base).toFixed(2));
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-6;
 
-const FIXED_SEGMENTS = 12; 
+const FIXED_SEGMENTS = 12;
 
-
-// 2) Add a bg tone helper (to color the "gaps" cleanly with the same tone):
 const getToneBg = (tone: string) => {
   switch (tone) {
     case 'blue': return 'bg-blue-500';
@@ -36,19 +36,18 @@ const getToneBg = (tone: string) => {
   }
 };
 
-
 const getBorderColor = (tone: string) => {
   switch (tone) {
-    case 'blue': return 'border-blue-500';
-    case 'cyan': return 'border-cyan-500';
-    case 'purple': return 'border-purple-500';
-    case 'teal': return 'border-teal-500';
-    case 'indigo': return 'border-indigo-500';
-    default: return 'border-blue-500';
+    case 'blue': return 'ring-blue-500';
+    case 'cyan': return 'ring-cyan-500';
+    case 'purple': return 'ring-purple-500';
+    case 'teal': return 'ring-teal-500';
+    case 'indigo': return 'ring-indigo-500';
+    default: return 'ring-blue-500';
   }
 };
 
-
+/* ---------- colors for cells ---------- */
 
 const getRecommendationColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
@@ -56,46 +55,40 @@ const getRecommendationColor = (value: number, type: string) => {
     if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-600';
     return 'bg-red-600';
   }
- 
-  
+
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-600';
-    // NOTE: You may want (value >= 6 && value < 7) || (value > 9 && value <= 10) here.
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-600';
     return 'bg-red-600';
   }
 
-  
   if (type === 'Movement') {
     if (value >= 0.5) return 'bg-green-600';
     return 'bg-red-600';
   }
 
-  
   if (type === 'Nutrition') {
     if (value >= 1 && value <= 3) return 'bg-green-600';
-    if (value > 3 && value < 5) return 'bg-orange-600'; // FIX: removed extra ')', adjusted threshold
+    if (value > 3 && value < 5) return 'bg-orange-600';
     return 'bg-red-600';
   }
 
-  
   if (type === 'Downtime') {
     if (value >= 1 && value <= 2) return 'bg-green-600';
-    if (value > 2 && value <= 3) return 'bg-orange-600'; // FIX: added missing ')', defined upper bound
+    if (value > 2 && value <= 3) return 'bg-orange-600';
     return 'bg-red-600';
   }
+
   return 'bg-gray-600';
 };
 
-
-
-const getUnselectedColor =  (value: number, type: string) => {
+const getUnselectedColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
     if (value >= 2 && value <= 4) return 'bg-green-200';
     if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-200';
     return 'bg-red-200';
   }
- 
+
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-200';
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-200';
@@ -122,37 +115,42 @@ const getUnselectedColor =  (value: number, type: string) => {
   return 'bg-gray-200';
 };
 
+/* ---------- segmented bar ---------- */
 
-// SegmentedCommitBar：12 格只管「顯示位置」；真正回傳的值一律貼齊 allowedStep
+type Tone = 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
+
 const SegmentedCommitBar: React.FC<{
-  segments: number;            // 固定 12
-  start: number;               // 例：sleep=4，其它=0
-  max: number;                 // 例：focus=6, sleep=10...
-  allowedStep: number;         // 你原本的步進（0.5 或 1）
-  selectedIdx: number;         // 用當前值換算成的格索引
+  start: number;          // e.g., sleep=4, others=0
+  max: number;            // e.g., 6 or 10
+  allowedStep: number;    // your original step (0.5 / 1 / etc.)
+  selectedIdx: number;    // based on current value projected to 12 cells
   onChange: (value: number) => void;
-  borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
+  borderTone: Tone;
   name: string;
-}> = ({ segments, start, max, allowedStep, selectedIdx, onChange, borderTone, name }) => {
-  const BORDER_COLOR = getBorderColor(borderTone);
-  const BG_TONE = getToneBg(borderTone); // 和你的 tone 對上（可沿用前面提供的 getToneBg）
+}> = ({ start, max, allowedStep, selectedIdx, onChange, borderTone, name }) => {
+  const toneRing = getBorderColor(borderTone); // ring-*
+  const toneBg = getToneBg(borderTone);        // bg-* (for the gaps background)
 
   return (
-    <div className={cn(
-      'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
-      'ring-2', BORDER_COLOR, BG_TONE
-    )}>
-      {Array.from({ length: segments }).map((_, idx) => {
-        // 這格在 0~1 的位置（0=左端，1=右端）
-        const t = segments === 1 ? 0 : idx / (segments - 1);
-        // 把 t 投影到實際範圍，再「貼齊」原步進
-        const valRaw = start + t * (max - start);
-        const snappedVal = clamp(snapTo(valRaw, allowedStep), start, max);
+    <div
+      className={cn(
+        'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
+        'ring-2', toneRing,
+        toneBg
+      )}
+    >
+      {Array.from({ length: FIXED_SEGMENTS }).map((_, idx) => {
+        // position 0..1 across 12 cells
+        const t = FIXED_SEGMENTS === 1 ? 0 : idx / (FIXED_SEGMENTS - 1);
+        // raw value at this cell, then snap to allowed step and clamp
+        const raw = start + t * (max - start);
+        const snappedVal = clamp(snapTo(raw, allowedStep), start, max);
 
         const active = idx === selectedIdx;
-        const showLabel = (idx === 0 || idx === segments - 1 || isInt(snappedVal))
-          ? String(Math.round(snappedVal))
-          : null;
+        const showLabel =
+          idx === 0 || idx === FIXED_SEGMENTS - 1 || isInt(snappedVal)
+            ? String(Math.round(snappedVal))
+            : null;
 
         return (
           <div
@@ -173,82 +171,43 @@ const SegmentedCommitBar: React.FC<{
   );
 };
 
+/* ---------- main section ---------- */
 
-// CommitSection：索引用「當前值」反推到 12 格的位置（不改你的值），sleep 從 4 開始
-{commitments.map((c) => {
-  const startForBar = c.id === 'sleep' ? 4 : 0;
-  const segments = FIXED_SEGMENTS;
-
-  // 用目前 value 在區間的比例，換算到 12 格（不會出現奇怪小數）
-  const ratio = (c.value - startForBar) / (c.max - startForBar);
-  const selectedIdx = Math.max(0, Math.min(segments - 1, Math.round(ratio * (segments - 1))));
-
+const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
-    <div key={c.id} className="space-y-1">
-      <div className="flex items-baseline justify-between">
-        <h3 className="font-medium text-gray-700">{c.name}</h3>
-        <p className="text-sm text-gray-600 font-medium">{c.value} {c.unit}</p>
-      </div>
+    <div className="space-y-2">
+      {commitments.map((c) => {
+        const startForBar = c.id === 'sleep' ? 4 : 0; // sleep starts at 4h; others at 0h
 
-      <SegmentedCommitBar
-        segments={segments}
-        start={startForBar}
-        max={c.max}
-        allowedStep={c.step}                
-        selectedIdx={selectedIdx}
-        onChange={(v) => onUpdateCommitment(c.id, v)} 
-        borderTone={c.borderTone}
-        name={c.name}
-      />
+        // project current value to 12 cells (0..11), clamp to safe range
+        const ratio = (c.value - startForBar) / (c.max - startForBar || 1);
+        const selectedIdx = Math.max(
+          0,
+          Math.min(FIXED_SEGMENTS - 1, Math.round(ratio * (FIXED_SEGMENTS - 1)))
+        );
+
+        return (
+          <div key={c.id} className="space-y-1">
+            <div className="flex items-baseline justify-between">
+              <h3 className="font-medium text-gray-700">{c.name}</h3>
+              <p className="text-sm text-gray-600 font-medium">
+                {c.value} {c.unit}
+              </p>
+            </div>
+
+            <SegmentedCommitBar
+              start={startForBar}
+              max={c.max}
+              allowedStep={c.step}
+              selectedIdx={selectedIdx}
+              onChange={(v) => onUpdateCommitment(c.id, v)}
+              borderTone={c.borderTone}
+              name={c.name}
+            />
+          </div>
+        );
+      })}
     </div>
-  );
-})}
-
-  
-const startForBar = commitment.id === 'sleep' ? 4 : 0; // keep your sleep start at 4h
-        
- const segments = FIXED_SEGMENTS; // always 12
-// derive a dynamic step so 12 cells span start→max (12 points => 11 intervals)
-
-        const derivedStep = (commitment.max - startForBar) / (segments - 1);
-        
- const selectedIdx = Math.max(0, Math.min(
- segments - 1,
- Math.round((commitment.value - startForBar) / derivedStep)
-));
-
-        
-  return (
-    <div key={commitment.id} className="space-y-1"> {/* half the previous spacing */}
-      <div className="flex items-baseline justify-between">
-        <h3 className="font-medium text-gray-700">{commitment.name}</h3>
-        <p className="text-sm text-gray-600 font-medium">
-          {commitment.value} {commitment.unit}
-        </p>
-      </div>
-
-      <SegmentedCommitBar
-        segments={segments}
-      step={derivedStep}
-        start={startForBar}                  // CHANGED
-        selectedIdx={selectedIdx}           // CHANGED
-        onChange={(value) => onUpdateCommitment(commitment.id, value)}
-        borderTone={commitment.borderTone}
-        name={commitment.name}
-         max={commitment.max}
-      />
-    </div>
-  );
-})}
-
-
-
-
-
-
-        
-      </div>
-    
   );
 };
 
