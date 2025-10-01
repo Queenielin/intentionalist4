@@ -99,7 +99,7 @@ const SegmentedCommitBar: React.FC<{
   return (
     <div className={cn(
       'inline-grid grid-flow-col auto-cols-[1.5rem] gap-0 rounded-sm',
-      'border', BORDER_COLOR
+      'border-2', BORDER_COLOR
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
         const endVal = start + (idx + 1) * step;
@@ -110,7 +110,7 @@ const SegmentedCommitBar: React.FC<{
             key={idx}
             className={cn(
               'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-              'border-l', BORDER_COLOR,
+              'border-l-2', BORDER_COLOR,
               idx === segments - 1 && ['border-r', BORDER_COLOR],
               'rounded-none',
               active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
@@ -135,26 +135,30 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
           const selectedIdx = Math.floor(commitment.value / commitment.step) - 1;
           
           return (
-            <div key={commitment.id} className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="font-medium text-gray-700">{commitment.name}</h3>
-                <p className="text-sm text-gray-500">
-                  {commitment.value} {commitment.unit}
-                </p>
-              </div>
-              <SegmentedCommitBar
-                segments={segments}
-                step={commitment.step}
-                start={0}
-                selectedIdx={selectedIdx}
-                onChange={(value) => onUpdateCommitment(commitment.id, value)}
-                borderTone={commitment.borderTone}
-                name={commitment.name}
-              />
-            </div>
-          );
-        })}
-      </div>
+          
+            
+          // CHANGED: header row (title + hour), bar below
+<div key={commitment.id} className="space-y-2">
+  <div className="flex items-baseline justify-between">
+    <h3 className="font-medium text-gray-700">{commitment.name}</h3>
+    <p className="text-sm text-gray-600 font-medium">
+      {commitment.value} {commitment.unit}
+    </p>
+  </div>
+
+  <SegmentedCommitBar
+    segments={segments}
+    step={commitment.step}
+    start={0}
+    selectedIdx={selectedIdx}
+    onChange={(value) => onUpdateCommitment(commitment.id, value)}
+    borderTone={commitment.borderTone}
+    name={commitment.name}
+  />
+</div>
+
+
+    
   );
 };
 
