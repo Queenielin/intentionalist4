@@ -29,31 +29,33 @@ const getBorderColor = (tone: string) => {
 
 const getRecommendationColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
-    if (value >= 2 && value <= 4) return 'bg-green-300';
-    if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 2 && value <= 4) return 'bg-green-600';
+    if ((value >= 1 && value < 2) || (value > 4 && value <= 6)) return 'bg-orange-600';
+    return 'bg-red-600';
   }
   if (type === 'Sleep') {
-    if (value >= 7 && value <= 9) return 'bg-green-300';
-    if ((value >= 6 && value < 7) || (value > 9 && value <= 10)) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 7 && value <= 9) return 'bg-green-600';
+    if ((value >= 6 && value < 7) || (value > 9 && value <= 10)) return 'bg-orange-600';
+    return 'bg-red-600';
   }
   if (type === 'Movement') {
-    if (value >= 1 && value <= 2) return 'bg-green-300';
-    if ((value >= 0.5 && value < 1) || (value > 2 && value <= 3)) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 1 && value <= 2) return 'bg-green-600';
+    if ((value >= 0.5 && value < 1) || (value > 2 && value <= 3)) return 'bg-orange-600';
+    return 'bg-red-600';
   }
   if (type === 'Nutrition') {
-    if (value >= 3 && value <= 5) return 'bg-green-300';
-    if ((value >= 2 && value < 3) || (value > 5 && value <= 6)) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 3 && value <= 5) return 'bg-green-600';
+    if ((value >= 2 && value < 3) || (value > 5 && value <= 6)) return 'bg-orange-600';
+    return 'bg-red-600';
   }
+  
   if (type === 'Downtime') {
-    if (value >= 1 && value <= 3) return 'bg-green-300';
-    if ((value >= 0.5 && value < 1) || (value > 3 && value <= 4)) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 1 && value <= 3) return 'bg-green-600';
+    if ((value >= 0.5 && value < 1) || (value > 3 && value <= 4)) return 'bg-orange-600';
+    return 'bg-red-600';
   }
-  return 'bg-gray-300';
+  
+  return 'bg-gray-600';
 };
 
 const getUnselectedColor = (value: number, type: string) => {
@@ -102,25 +104,29 @@ const SegmentedCommitBar: React.FC<{
       'border-2', BORDER_COLOR
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
-        const endVal = start + (idx + 1) * step;
-        const active = idx === selectedIdx;
-        
-        return (
-          <div
-            key={idx}
-            className={cn(
-              'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-              'border-l-2', BORDER_COLOR,
-              idx === segments - 1 && ['border-r', BORDER_COLOR],
-              'rounded-none',
-              active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
-              active && 'font-bold'
-            )}
-            onClick={() => onChange(endVal)}
-          >
-            {endVal}
-          </div>
-        );
+      
+   const endVal = start + idx * step; // first cell is start (0 for most, 4 for sleep)
+const active = idx === selectedIdx;
+const showLabel = active || Number.isInteger(endVal) ? String(endVal) : null;
+
+return (
+  <div
+    key={idx}
+    className={cn(
+      'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
+      'border-l-2', BORDER_COLOR,                         // thicker seams
+      idx === segments - 1 && ['border-r-2', BORDER_COLOR],
+      'rounded-none',
+      active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
+      active && 'font-bold'
+    )}
+    onClick={() => onChange(endVal)}
+  >
+    {showLabel}
+  </div>
+);
+
+      
       })}
     </div>
   );
@@ -130,36 +136,42 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
   return (
    
       <div className="space-y-4">
+       
+
+
         {commitments.map((commitment) => {
-          const segments = commitment.max / commitment.step;
-          const selectedIdx = Math.floor(commitment.value / commitment.step) - 1;
-          
-          // CHANGED: header row (title + hour), bar below
-          
-            
-            {/* CHANGED: header row (title + hour), bar below*/}
-return (
-<div key={commitment.id} className="space-y-2">
-  <div className="flex items-baseline justify-between">
-    <h3 className="font-medium text-gray-700">{commitment.name}</h3>
-    <p className="text-sm text-gray-600 font-medium">
-      {commitment.value} {commitment.unit}
-    </p>
-  </div>
+  const startForBar = commitment.id === 'sleep' ? 4 : 0; // sleep starts at 4h; others at 0h
+  const segments = Math.floor((commitment.max - startForBar) / commitment.step) + 1; // include first cell
+  const selectedIdx = Math.max(0, Math.round((commitment.value - startForBar) / commitment.step));
 
-  <SegmentedCommitBar
-    segments={segments}
-    step={commitment.step}
-    start={0}
-    selectedIdx={selectedIdx}
-    onChange={(value) => onUpdateCommitment(commitment.id, value)}
-    borderTone={commitment.borderTone}
-    name={commitment.name}
-  />
-</div>
-);
+  return (
+    <div key={commitment.id} className="space-y-1"> {/* half the previous spacing */}
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-medium text-gray-700">{commitment.name}</h3>
+        <p className="text-sm text-gray-600 font-medium">
+          {commitment.value} {commitment.unit}
+        </p>
+      </div>
 
-        })}
+      <SegmentedCommitBar
+        segments={segments}
+        step={commitment.step}
+        start={startForBar}                  {/* CHANGED */}
+        selectedIdx={selectedIdx}           {/* CHANGED */}
+        onChange={(value) => onUpdateCommitment(commitment.id, value)}
+        borderTone={commitment.borderTone}
+        name={commitment.name}
+      />
+    </div>
+  );
+})}
+
+
+
+
+
+
+        
       </div>
     
   );
