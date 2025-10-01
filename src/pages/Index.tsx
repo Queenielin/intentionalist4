@@ -13,7 +13,7 @@ const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
   const [commitments, setCommitments] = useState([
-    { id: 'focusTime', name: 'Focus Time', value: 3, max: 12, step: 0.5, unit: 'h', borderTone: 'blue' as const },
+    { id: 'focusTime', name: 'Focus Time', value: 3, max: 12, step: 0.5, unit: 'h', borderTone: 'deep-work' as const },
     { id: 'sleep', name: 'Sleep', value: 8, max: 12, step: 0.5, unit: 'h', borderTone: 'blue' as const },
     { id: 'nutrition', name: 'Nutrition', value: 2, max: 6, step: 0.5, unit: 'h', borderTone: 'purple' as const },
     { id: 'movement', name: 'Movement', value: 1, max: 6, step: 0.5, unit: 'h', borderTone: 'teal' as const },
