@@ -311,23 +311,18 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
 
       {/* Sleep: 5.5–9.0h */}
       
- <SegmentedCommitBar
-  title="Focus Time"
-  subtitle="(deep work target)"
-  value={value}
-  highlightValue={bar1Val ?? null}
-  labelsEnabled={true}
-  onChange={(h) => { /* ... */ }}
-  segments={segments}
-  step={step}
-  start={start1}
-  colorForIndex={colorBar1}
-  showLabelAtIndex={fullHourLabel}
-  lightDividerAt={1}
-  tipForEndVal={tipFocus}
-  defaultValue={DEFAULT_COMMITMENTS.focusTime}  {/* <-- ADDED */}
-/>
-
+      <SegmentedCommitBar
+        title="Sleep"
+        subtitle="(5.5–9h)"
+        value={commitments.sleep}
+        onChange={(h) => onUpdateCommitment('sleep', h)}
+        segments={8}
+        step={0.5}
+        start={5.0} // 5.5, 6.0, ..., 9.0
+        colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'green')}
+        showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
+        tipForEndVal={tipSleep}
+      />
 
       
       {/* Nutrition: 0.5–3.0h */}
