@@ -30,6 +30,54 @@ const DEFAULT_COMMITMENTS = {
   downtime: 1.5
 };
 
+const toneClasses = (tone: 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'teal' | 'indigo', active: boolean) => {
+  const bg = active
+    ? tone === 'red'
+      ? 'bg-red-500'
+      : tone === 'orange'
+      ? 'bg-orange-500'
+      : tone === 'green'
+      ? 'bg-green-600'
+      : tone === 'blue'
+      ? 'bg-blue-500'
+      : tone === 'purple'
+      ? 'bg-purple-500'
+      : tone === 'teal'
+      ? 'bg-teal-500'
+      : 'bg-indigo-500'
+    : tone === 'red'
+    ? 'bg-red-100'
+    : tone === 'orange'
+    ? 'bg-orange-100'
+    : tone === 'green'
+    ? 'bg-green-100'
+    : tone === 'blue'
+    ? 'bg-blue-100'
+    : tone === 'purple'
+    ? 'bg-purple-100'
+    : tone === 'teal'
+    ? 'bg-teal-100'
+    : 'bg-indigo-100';
+
+  const fg = active
+    ? 'text-white'
+    : tone === 'red'
+    ? 'text-red-700'
+    : tone === 'orange'
+    ? 'text-orange-700'
+    : tone === 'green'
+    ? 'text-green-700'
+    : tone === 'blue'
+    ? 'text-blue-700'
+    : tone === 'purple'
+    ? 'text-purple-700'
+    : tone === 'teal'
+    ? 'text-teal-700'
+    : 'text-indigo-700';
+
+  return `${bg} ${fg}`;
+};
+
 function tipFocus(endVal: number) {
   if (endVal >= 5.5) return '≥5.5h: fatigue risk; quality tends to drop after prolonged focus.';
   if (endVal >= 5.0) return '≈5h: near upper bound for most; plan breaks and recovery.';
@@ -170,22 +218,6 @@ const defaultIdx = defaultValue !== undefined
           const endVal = start + (idx + 1) * step;
           const tone = colorForIndex(idx, endVal);
           const active = idx === selectedIdx;
-
-          const solidTone =
-            tone === 'red'
-              ? 'bg-red-500 text-white'
-              : tone === 'orange'
-              ? 'bg-orange-500 text-white'
-              : 'bg-green-600 text-white';
-
-          const lightTone =
-            tone === 'red'
-              ? 'bg-red-200 text-red-800'
-              : tone === 'orange'
-              ? 'bg-orange-200 text-orange-800'
-              : 'bg-green-200 text-green-800';
-
-          const appliedTone = active ? solidTone : lightTone;
 
           const baseDivider =
             idx === 0
@@ -389,7 +421,40 @@ function DailyCommitmentBar({
         ? 'bg-purple-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-purple-500'
         : tone === 'teal'
         ? 'bg-teal-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-teal-500'
-        : tone === 'indigo'
+        : 'bg-indigo-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-indigo-500';
+    }
+    return tone === 'green'
+      ? 'bg-green-500'
+      : tone === 'orange'
+      ? 'bg-orange-500'
+      : tone === 'red'
+      ? 'bg-red-500'
+      : tone === 'blue'
+      ? 'bg-blue-500'
+      : tone === 'purple'
+      ? 'bg-purple-500'
+      : tone === 'teal'
+      ? 'bg-teal-500'
+      : tone === 'indigo'
+      ? 'bg-indigo-500'
+      : 'bg-gray-500';
+  };
+
+  return (
+    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
+      {cells.map((c, i) => (
+        <div
+          key={i}
+          className={cn(
+            'h-8 w-8 border border-gray-300',
+            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
+          )}
+          title={`${i}:00`}
+        />
+      ))}
+    </div>
+  );
+}
         ? 'bg-indigo-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-indigo-500'
         : 'bg-gray-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-gray-500';
     }
