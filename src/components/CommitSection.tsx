@@ -101,7 +101,12 @@ function SegmentedCommitBar({
   defaultValue?: number;
   
 }) {
- 
+
+// ADDED: show integers without .0; keep halves as .5
+const formatHours = (h: number) => (Number.isInteger(h) ? String(h) : String(h));
+// (If you later want '1.5h' etc., change to `${h}h`.)
+
+  
 // CHANGED: also fall back to defaultValue, then start
 const basis = highlightValue ?? value ?? defaultValue ?? start; // <-- added "?? defaultValue ?? start"
 
@@ -125,7 +130,28 @@ const defaultIdx = defaultValue !== undefined
       <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
         {Array.from({ length: segments }).map((_, idx) => {
           const endVal = start + (idx + 1) * step;
-          const tone = colorForIndex(idx, endVal);
+
+// CHANGED: light fill for inactive; solid for active; stronger text color
+const solidTone =
+  tone === 'red'
+    ? 'bg-red-500 text-white'
+    : tone === 'orange'
+    ? 'bg-orange-500 text-white'
+    : 'bg-green-600 text-white';
+
+const lightTone =
+  tone === 'red'
+    ? 'bg-red-200 text-red-800'
+    : tone === 'orange'
+    ? 'bg-orange-200 text-orange-800'
+    : 'bg-green-200 text-green-800';
+
+// REPLACE prior class selection with:
+const appliedTone = active ? solidTone : lightTone;
+
+
+
+      
           const active = idx === selectedIdx;
 
           const bg =
@@ -160,15 +186,26 @@ const Square = (
     onClick={() => onChange(endVal)}
     /* removed title attr to avoid native tooltip */
     className={cn(
-      'relative h-8 w-7 flex items-center justify-center text-[11px] font-medium transition-colors',
-      bg, fg, divider,
-      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
-    )}
+      'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
+        toneClasses(tone, active),
+  baseDivider,
+  active && 'font-bold', // <-- ADDED
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
+)}
     aria-pressed={active}
   >
-    {label ? (
-      <span className="pointer-events-none select-none">{label}</span>
-    ) : null}
+// BEFORE:
+// {label ? <span className="pointer-events-none select-none">{label}</span> : null}
+
+// AFTER (CHANGED): if active, always show the exact endVal (e.g., 1.5); otherwise show the scheduled label (e.g., full hours)
+{active ? (
+  <span className="pointer-events-none select-none text-current">{formatHours(endVal)}</span> // <-- CHANGED
+) : label ? (
+  <span className="pointer-events-none select-none text-current">{label}</span> // <-- ADDED text-current to inherit tone
+) : null}
+
+
+    
   </button>
 );
 
@@ -322,6 +359,8 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'green')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipSleep}
+defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
+
       />
 
       
@@ -337,6 +376,8 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'green')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipNutrition}
+        defaultValue={DEFAULT_COMMITMENTS.nutrition} // <-- ADDED on the first Focus bar
+
       />
 
       {/* Movement: 0.5–4.0h */}
@@ -351,6 +392,8 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         colorForIndex={() => 'green'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipMovement}
+        defaultValue={DEFAULT_COMMITMENTS.movement} // <-- ADDED on the first Focus bar
+
       />
 
       {/* Downtime: 0.5–3.0h */}
@@ -365,6 +408,8 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         colorForIndex={() => 'green'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipDowntime}
+        defaultValue={DEFAULT_COMMITMENTS.downtime} // <-- ADDED on the first Focus bar
+
       />
     </div>
   );
