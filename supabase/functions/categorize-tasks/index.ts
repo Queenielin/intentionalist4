@@ -1,5 +1,9 @@
 // No need for std/http in Edge/Deploy:
 import "https://deno.land/x/xhr@0.1.0/mod.ts"; // fetch/XMLHttpRequest polyfill for some libs
+// ADD exactly one of these at the top with other imports:
+
+import DailyCommitmentSidebarBar from '@/components/DailyCommitmentSidebarBar'; // <-- default export
+
 
 const corsHeaders: HeadersInit = {
   "Access-Control-Allow-Origin": "*",
