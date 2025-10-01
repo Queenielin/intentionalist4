@@ -180,37 +180,45 @@ const SegmentedCommitBar: React.FC<{
 const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
     <div className="space-y-2">
-      {commitments.map((c) => {
-        const startForBar = c.id === 'sleep' ? 4 : 0; // sleep starts at 4h; others at 0h
+   
+/* ---------- inside CommitSection map ---------- */
 
-        // project current value to 12 cells (0..11), clamp to safe range
-        const ratio = (c.value - startForBar) / (c.max - startForBar || 1);
-        const selectedIdx = Math.max(
-          0,
-          Math.min(FIXED_SEGMENTS - 1, Math.round(ratio * (FIXED_SEGMENTS - 1)))
-        );
+{commitments.map((c) => {
+  const startForBar = c.id === 'sleep' ? 4 : 0;
 
-        return (
-          <div key={c.id} className="space-y-1">
-            <div className="flex items-baseline justify-between">
-              <h3 className="font-medium text-gray-700">{c.name}</h3>
-              <p className="text-sm text-gray-600 font-medium">
-                {c.value} {c.unit}
-              </p>
-            </div>
+  // map current value -> cell index:
+  // - values < max use 0.5h spacing
+  // - exactly max sits on the last cell
+  const idxFromValue = (v: number) => {
+    if (v >= c.max) return FIXED_SEGMENTS - 1;                  // last cell for max
+    const i = Math.round((v - startForBar) / CELL_STEP);        // 0.5h steps
+    return Math.max(0, Math.min(FIXED_SEGMENTS - 2, i));        // reserve last for max
+  };
 
-            <SegmentedCommitBar
-              start={startForBar}
-              max={c.max}
-              allowedStep={c.step}
-              selectedIdx={selectedIdx}
-              onChange={(v) => onUpdateCommitment(c.id, v)}
-              borderTone={c.borderTone}
-              name={c.name}
-            />
-          </div>
-        );
-      })}
+  const selectedIdx = idxFromValue(c.value);
+
+  return (
+    <div key={c.id} className="space-y-1">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-medium text-gray-700">{c.name}</h3>
+        <p className="text-sm text-gray-600 font-medium">{c.value} {c.unit}</p>
+      </div>
+
+      <SegmentedCommitBar
+        start={startForBar}
+        max={c.max}
+        allowedStep={c.step}
+        selectedIdx={selectedIdx}
+        onChange={(v) => onUpdateCommitment(c.id, v)}
+        borderTone={c.borderTone}
+        name={c.name}
+      />
+    </div>
+  );
+})}
+
+
+      
     </div>
   );
 };
