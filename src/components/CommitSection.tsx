@@ -141,7 +141,7 @@ function SegmentedCommitBar({
   segments: number;
   step?: number;
   start?: number;
-  colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'teal' | 'indigo';
+  colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green';
   showLabelAtIndex?: (idx: number, endVal: number) => string | undefined;
   lightDividerAt?: number;
   disabled?: boolean;
@@ -343,11 +343,11 @@ function DailyCommitmentBar({
 }: {
   // blocks = array of allocations with color class and hours length
   // e.g., [{ key: 'sleep', hours: 8.5, color: 'green' }, ...]
-  blocks: Array<{ key: string; hours: number; color: 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'teal' | 'indigo' }>;
+  blocks: Array<{ key: string; hours: number; color: 'green' | 'orange' | 'red' }>;
 }) {
   const totalCells = 24;
   // Build a flat array of 24 cells, each empty by default
-  const cells: Array<{ filled: boolean; half: boolean; color?: 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'teal' | 'indigo' }> =
+  const cells: Array<{ filled: boolean; half: boolean; color?: 'green' | 'orange' | 'red' }> =
     Array.from({ length: totalCells }, () => ({ filled: false, half: false }));
 
   // Fill cells in order of blocks; you can change stacking logic later
@@ -365,7 +365,7 @@ function DailyCommitmentBar({
     }
   }
 
-  const toneToBg = (tone?: 'green' | 'orange' | 'red' | 'blue' | 'purple' | 'teal' | 'indigo', half?: boolean) => {
+  const toneToBg = (tone?: 'green' | 'orange' | 'red', half?: boolean) => {
     if (!tone) return 'bg-transparent';
     if (half) {
       // half-fill by overlaying a half-width inner bar; base keeps a light background of the same tone
@@ -395,21 +395,18 @@ function DailyCommitmentBar({
       ? 'bg-purple-500'
       : tone === 'teal'
       ? 'bg-teal-500'
-      : tone === 'indigo'
-      ? 'bg-indigo-500'
-      : 'bg-gray-500';
+      : 'bg-indigo-500';
   };
 
   return (
-    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
-      {cells.map((c, i) => (
+    <div className="inline-grid grid-cols-12 gap-0 rounded-md shadow-sm overflow-hidden">
+      {cells.map((cell, idx) => (
         <div
-          key={i}
+          key={idx}
           className={cn(
-            'h-8 w-8 border border-gray-300',
-            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
+            'h-6 w-6 border border-gray-200',
+            toneToBg(cell.color, cell.half)
           )}
-          title={`${i}:00`}
         />
       ))}
     </div>
@@ -438,7 +435,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'blue')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipSleep}
-        defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
+defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
 
       />
 
