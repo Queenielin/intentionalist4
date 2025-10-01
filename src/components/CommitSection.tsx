@@ -166,39 +166,6 @@ const defaultIdx = defaultValue !== undefined
               onClick={() => onChange(endVal)}
               className={cn(
                 'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
-              : tone === 'red'
-              ? 'bg-red-100'
-              : tone === 'orange'
-              ? 'bg-orange-100'
-              : tone === 'green'
-              ? 'bg-green-100'
-              : tone === 'blue'
-              ? 'bg-blue-100'
-              : tone === 'purple'
-              ? 'bg-purple-100'
-              : tone === 'teal'
-              ? 'bg-teal-100'
-              : 'bg-indigo-100';
-
-            const fg = active
-              ? 'text-white'
-              : tone === 'red'
-              ? 'text-red-700'
-              : tone === 'orange'
-              ? 'text-orange-700'
-              : tone === 'green'
-              ? 'text-green-700'
-              : tone === 'blue'
-              ? 'text-blue-700'
-              : tone === 'purple'
-              ? 'text-purple-700'
-              : tone === 'teal'
-              ? 'text-teal-700'
-              : 'text-indigo-700';
-
-            return `${bg} ${fg}`;
-          };
-
                 toneClasses(tone, active),
                 baseDivider,
                 active && 'font-bold',
@@ -226,7 +193,6 @@ const defaultIdx = defaultValue !== undefined
           );
         })}
 
-        })}
       </div>
     </div>
   );
