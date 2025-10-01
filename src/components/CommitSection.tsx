@@ -214,12 +214,13 @@ const startForBar = commitment.id === 'sleep' ? 4 : 0; // keep your sleep start 
 
       <SegmentedCommitBar
         segments={segments}
-        step={commitment.step}
+      step={derivedStep}
         start={startForBar}                  // CHANGED
         selectedIdx={selectedIdx}           // CHANGED
         onChange={(value) => onUpdateCommitment(commitment.id, value)}
         borderTone={commitment.borderTone}
         name={commitment.name}
+         max={commitment.max}
       />
     </div>
   );
