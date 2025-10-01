@@ -138,7 +138,7 @@ const SegmentedCommitBar: React.FC<{
     <div
       className={cn(
         'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
-        'ring-2', toneRing,
+        'ring-4', toneRing,
         toneBg
       )}
     >
