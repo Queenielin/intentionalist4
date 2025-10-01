@@ -141,7 +141,10 @@ function SegmentedCommitBar({
   segments: number;
   step?: number;
   start?: number;
-  colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green';
+
+// AFTER (CHANGED: allow all tones you actually use)
+colorForIndex: (idx: number, endVal: number) => 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'teal' | 'indigo';
+
   showLabelAtIndex?: (idx: number, endVal: number) => string | undefined;
   lightDividerAt?: number;
   disabled?: boolean;
@@ -160,12 +163,12 @@ const basis = highlightValue ?? value ?? defaultValue ?? start; // <-- added "??
 
   
   const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
-const defaultIdx = defaultValue !== undefined 
-  ? Math.max(-1, Math.round((defaultValue - start) / step) - 1)
-  : -1;
 
-  const toneClasses = (tone: 'red' | 'orange' | 'green', active: boolean) => {
-    const bg = active
+
+  
+ 
+  
+  const bg = active
               ? tone === 'red'
               ? 'bg-red-500'
               : tone === 'orange'
@@ -331,6 +334,9 @@ function FocusTimeMultiBars({
   showLabelAtIndex={fullHourLabel}
   lightDividerAt={1}
   tipForEndVal={tipFocus}   // ✅ add this line
+   // ADD this prop to the Focus Time bar
+defaultValue={DEFAULT_COMMITMENTS.focusTime}
+
 />
 
 
@@ -377,84 +383,8 @@ function FocusTimeMultiBars({
 
 /* ---------- MAIN COMPONENT ---------- */
 
-// ADDED: DailyCommitmentBar (24 squares)
-function DailyCommitmentBar({
-  blocks,
-}: {
-  // blocks = array of allocations with color class and hours length
-  // e.g., [{ key: 'sleep', hours: 8.5, color: 'green' }, ...]
-  blocks: Array<{ key: string; hours: number; color: 'green' | 'orange' | 'red' }>;
-}) {
-  const totalCells = 24;
-  // Build a flat array of 24 cells, each empty by default
-  const cells: Array<{ filled: boolean; half: boolean; color?: 'green' | 'orange' | 'red' }> =
-    Array.from({ length: totalCells }, () => ({ filled: false, half: false }));
 
-  // Fill cells in order of blocks; you can change stacking logic later
-  let cursor = 0;
-  for (const b of blocks) {
-    const whole = Math.floor(b.hours);
-    const frac = b.hours - whole;
 
-    for (let i = 0; i < whole && cursor < totalCells; i++, cursor++) {
-      cells[cursor] = { filled: true, half: false, color: b.color };
-    }
-    if (frac >= 0.5 && cursor < totalCells) {
-      cells[cursor] = { filled: true, half: true, color: b.color };
-      cursor++;
-    }
-  }
-
-  const toneToBg = (tone?: 'green' | 'orange' | 'red', half?: boolean) => {
-    if (!tone) return 'bg-transparent';
-    if (half) {
-      // half-fill by overlaying a half-width inner bar; base keeps a light background of the same tone
-      return tone === 'green'
-        ? 'bg-green-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-green-500'
-        : tone === 'orange'
-        ? 'bg-orange-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-orange-500'
-        : tone === 'red'
-        ? 'bg-red-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-red-500'
-        : tone === 'blue'
-        ? 'bg-blue-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-blue-500'
-        : tone === 'purple'
-        ? 'bg-purple-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-purple-500'
-        : tone === 'teal'
-        ? 'bg-teal-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-teal-500'
-        : 'bg-indigo-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-indigo-500';
-    }
-    return tone === 'green'
-      ? 'bg-green-500'
-      : tone === 'orange'
-      ? 'bg-orange-500'
-      : tone === 'red'
-      ? 'bg-red-500'
-      : tone === 'blue'
-      ? 'bg-blue-500'
-      : tone === 'purple'
-      ? 'bg-purple-500'
-      : tone === 'teal'
-      ? 'bg-teal-500'
-      : tone === 'indigo'
-      ? 'bg-indigo-500'
-      : 'bg-gray-500';
-  };
-
-  return (
-    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
-      {cells.map((c, i) => (
-        <div
-          key={i}
-          className={cn(
-            'h-8 w-8 border border-gray-300',
-            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
-          )}
-          title={`${i}:00`}
-        />
-      ))}
-    </div>
-  );
-}
 
 export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
   return (
@@ -534,16 +464,19 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
       {/* ADDED: Daily Commitment (24 squares, same tones) */}
       <div>
         <h3 className="text-sm font-medium text-gray-700 mb-2">Daily Commitment</h3>
-        <DailyCommitmentBar
-          blocks={[
-            // CHANGED/CONFIG: map per-category to a tone you want to reuse
-            { key: 'focusTime', hours: commitments.focusTime, color: 'orange' }, // e.g., focus = orange
-            { key: 'sleep', hours: commitments.sleep, color: 'blue' },         // sleep = blue
-            { key: 'nutrition', hours: commitments.nutrition, color: 'purple' }, // meals = purple
-            { key: 'movement', hours: commitments.movement, color: 'teal' },   // movement = teal
-            { key: 'downtime', hours: commitments.downtime, color: 'indigo' },     // downtime = indigo
-          ]}
-        />
+
+
+
+<DailyCommitmentSidebarBar
+  focusHours={commitments.focusTime}
+  sleepHours={commitments.sleep}
+  nutritionHours={commitments.nutrition}
+  movementHours={commitments.movement}
+  downtimeHours={commitments.downtime}
+/>
+
+
+        
         <p className="mt-1 text-xs text-muted-foreground">
           Uncommitted time shows as empty boxes.
         </p>
