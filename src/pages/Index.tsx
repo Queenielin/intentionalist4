@@ -28,8 +28,7 @@ const Index = () => {
       id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title,
       category: 'Social & Relational', // Default category while AI processes
-      
-      duration: duration || 30,  // Default to 30 if not provided
+      duration: duration || 30, // Default to 30 if not provided
       completed: false,
       slotId: '',
       scheduledDay: scheduledDay || 'today',
@@ -63,11 +62,8 @@ const Index = () => {
                 ...t, 
                 isCategorizing: false, 
                 category: classification.category,
-                title: classification.title, 
-              
-                // Use cleaned title from AI
-              
-              duration: hasManualDuration ? (duration || 30) : classification.duration
+                title: classification.title, // Use cleaned title from AI
+                duration: hasManualDuration ? (duration || 30) : classification.duration
               } 
             : t
         ));
