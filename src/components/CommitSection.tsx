@@ -126,13 +126,18 @@ const SegmentedCommitBar: React.FC<{
   onChange: (value: number) => void;
   borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
   name: string;
+  max?: number;
 }> = ({ segments, step, start, selectedIdx, onChange, borderTone, name }) => {
   const BORDER_COLOR = getBorderColor(borderTone);
+  const BG_TONE = getToneBg(borderTone);
 
   return (
     <div className={cn(
-      'inline-grid grid-flow-col auto-cols-[1.5rem] gap-0 rounded-sm',
-      'border-4', BORDER_COLOR
+     'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
++       'ring-4',
++       BORDER_COLOR,
++       BG_TONE // gap color comes from container background
+      
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
       
