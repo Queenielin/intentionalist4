@@ -16,14 +16,12 @@ interface CommitSectionProps {
   onUpdateCommitment: (id: string, value: number) => void;
 }
 
-// helpers：把值「貼齊」你原本的步進（例如 0.5h / 1h），並做邊界保護
 const snapTo = (val: number, base: number) =>
   Number((Math.round(val / base) * base).toFixed(2));
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-6;
 
-const FIXED_SEGMENTS = 12; // 一律 12 格
-
+const FIXED_SEGMENTS = 12; 
 
 
 // 2) Add a bg tone helper (to color the "gaps" cleanly with the same tone):
