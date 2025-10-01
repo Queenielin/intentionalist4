@@ -164,46 +164,6 @@ const defaultIdx = defaultValue !== undefined
   ? Math.max(-1, Math.round((defaultValue - start) / step) - 1)
   : -1;
 
-  const toneClasses = (tone: 'red' | 'orange' | 'green', active: boolean) => {
-    const bg = active
-              ? tone === 'red'
-              ? 'bg-red-500'
-              : tone === 'orange'
-              ? 'bg-orange-500'
-              : 'bg-green-600'
-              : tone === 'red'
-              ? 'bg-red-100'
-              : tone === 'orange'
-              ? 'bg-orange-100'
-              : tone === 'green'
-              ? 'bg-green-100'
-              : tone === 'blue'
-              ? 'bg-blue-100'
-              : tone === 'purple'
-              ? 'bg-purple-100'
-              : tone === 'teal'
-              ? 'bg-teal-100'
-              : 'bg-indigo-100';
-
-            const fg = active
-              ? 'text-white'
-              : tone === 'red'
-              ? 'text-red-700'
-              : tone === 'orange'
-              ? 'text-orange-700'
-              : tone === 'green'
-              ? 'text-green-700'
-              : tone === 'blue'
-              ? 'text-blue-700'
-              : tone === 'purple'
-              ? 'text-purple-700'
-              : tone === 'teal'
-              ? 'text-teal-700'
-              : 'text-indigo-700';
-
-            return `${bg} ${fg}`;
-          };
-
   
   return (
     <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
@@ -434,61 +394,6 @@ function DailyCommitmentBar({
       : tone === 'purple'
       ? 'bg-purple-500'
       : tone === 'teal'
-      ? 'bg-teal-500'
-      : tone === 'indigo'
-      ? 'bg-indigo-500'
-      : 'bg-gray-500';
-  };
-
-  return (
-    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
-      {cells.map((c, i) => (
-        <div
-          key={i}
-          className={cn(
-            'h-8 w-8 border border-gray-300',
-            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
-          )}
-          title={`${i}:00`}
-        />
-      ))}
-    </div>
-  );
-}
-        ? 'bg-indigo-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-indigo-500'
-        : 'bg-gray-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-gray-500';
-    }
-    return tone === 'green'
-      ? 'bg-green-500'
-      : tone === 'orange'
-      ? 'bg-orange-500'
-      : tone === 'red'
-      ? 'bg-red-500'
-      : tone === 'blue'
-      ? 'bg-blue-500'
-      : tone === 'purple'
-      ? 'bg-purple-500'
-      : tone === 'teal'
-      ? 'bg-teal-500'
-      : tone === 'indigo'
-      ? 'bg-indigo-500'
-      : 'bg-gray-500';
-  };
-
-  return (
-    <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
-      {cells.map((c, i) => (
-        <div
-          key={i}
-          className={cn(
-            'h-8 w-8 border border-gray-300',
-            c.filled ? toneToBg(c.color, c.half) : 'bg-transparent'
-          )}
-          title={`${i}:00`}
-        />
-      ))}
-    </div>
-  );
 }
 
 export default function CommitSection({ commitments, onUpdateCommitment }: CommitSectionProps) {
