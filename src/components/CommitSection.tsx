@@ -194,9 +194,9 @@ const SegmentedCommitBar: React.FC<{
         segments={segments}
         start={startForBar}
         max={c.max}
-        allowedStep={c.step}                  // ← 保留你的「原邏輯步進」
+        allowedStep={c.step}                
         selectedIdx={selectedIdx}
-        onChange={(v) => onUpdateCommitment(c.id, v)} // ← 回傳的一定是貼齊步進的值
+        onChange={(v) => onUpdateCommitment(c.id, v)} 
         borderTone={c.borderTone}
         name={c.name}
       />
