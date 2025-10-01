@@ -8,7 +8,7 @@ interface Commitment {
   max: number;
   step: number; // allowed step (e.g., 0.5, 1)
   unit: string;
-  borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
+  borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo'  | 'deep-work';
 }
 
 interface CommitSectionProps {
