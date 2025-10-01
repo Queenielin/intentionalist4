@@ -135,7 +135,7 @@ return (
 const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
    
-      <div className="space-y-4">
+      <div className="space-y-2">
        
 
 
