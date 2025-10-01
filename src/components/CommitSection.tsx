@@ -155,7 +155,6 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
           );
         })}
       </div>
-    </div>
   );
 };
 
