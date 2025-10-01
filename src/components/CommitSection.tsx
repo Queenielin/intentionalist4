@@ -116,7 +116,7 @@ const SegmentedCommitBar: React.FC<{
   return (
     <div className={cn(
       'inline-grid grid-flow-col auto-cols-[1.5rem] gap-0 rounded-sm',
-      'border-3', BORDER_COLOR
+      'border-4', BORDER_COLOR
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
       
@@ -132,8 +132,8 @@ return (
     
 className={cn(
   'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-  'border-l-3', BORDER_COLOR,
-  idx === segments - 1 && 'border-r-3',
+  'border-l-4', BORDER_COLOR,
+  idx === segments - 1 && 'border-r-4',
   idx === segments - 1 && BORDER_COLOR,
   'rounded-none',
   active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
