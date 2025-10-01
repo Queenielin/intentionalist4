@@ -105,7 +105,7 @@ const SegmentedCommitBar: React.FC<{
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
       
-   const endVal = start + idx * step; {/*  first cell is start (0 for most, 4 for sleep) */}
+   const endVal = start + idx * step; // first cell is start (0 for most, 4 for sleep)
 const active = idx === selectedIdx;
 const showLabel = active || Number.isInteger(endVal) ? String(endVal) : null;
 
@@ -140,8 +140,8 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
 
 
         {commitments.map((commitment) => {
-  const startForBar = commitment.id === 'sleep' ? 4 : 0; {/*  sleep starts at 4h; others at 0h*/}
-  const segments = Math.floor((commitment.max - startForBar) / commitment.step) + 1; {/* include first cell*/}
+  const startForBar = commitment.id === 'sleep' ? 4 : 0; // sleep starts at 4h; others at 0h
+  const segments = Math.floor((commitment.max - startForBar) / commitment.step) + 1; // include first cell
   const selectedIdx = Math.max(0, Math.round((commitment.value - startForBar) / commitment.step));
 
   return (
@@ -156,8 +156,8 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
       <SegmentedCommitBar
         segments={segments}
         step={commitment.step}
-        start={startForBar}                  {/* CHANGED */}
-        selectedIdx={selectedIdx}           {/* CHANGED */}
+        start={startForBar}                  // CHANGED
+        selectedIdx={selectedIdx}           // CHANGED
         onChange={(value) => onUpdateCommitment(commitment.id, value)}
         borderTone={commitment.borderTone}
         name={commitment.name}
