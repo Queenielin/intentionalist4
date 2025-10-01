@@ -22,6 +22,14 @@ interface CommitSectionProps {
   ) => void;
 }
 
+const DEFAULT_COMMITMENTS = {
+  focusTime: 4,
+  sleep: 8,
+  nutrition: 2,
+  movement: 1,
+  downtime: 1.5
+};
+
 function tipFocus(endVal: number) {
   if (endVal >= 5.5) return '≥5.5h: fatigue risk; quality tends to drop after prolonged focus.';
   if (endVal >= 5.0) return '≈5h: near upper bound for most; plan breaks and recovery.';
@@ -74,6 +82,9 @@ function SegmentedCommitBar({
   disabled = false,
   tipForEndVal,            // ✅ NEW/RESTORED: per-square tooltip content
 }: {
+
+  defaultValue?: number;  // ← ADD THIS LINE
+}: {
   title?: string;
   subtitle?: string;
   value: number;
@@ -88,10 +99,20 @@ function SegmentedCommitBar({
   lightDividerAt?: number;
   disabled?: boolean;
   tipForEndVal?: (endVal: number) => string;  // ✅
+defaultValue?: number;  // ← ADD THIS LINE
+  
 }) {
-  const basis = highlightValue ?? value;
-  const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
+ 
+  
+const basis = highlightValue ?? value;
+const selectedIdx = Math.max(-1, Math.round((basis - start) / step) - 1);
+const defaultIdx = defaultValue !== undefined 
+  ? Math.max(-1, Math.round((defaultValue - start) / step) - 1)
+  : -1;
 
+  
+
+  
   return (
     <div className={cn('mb-2', disabled && 'opacity-50 pointer-events-none')}>
       {title ? (
