@@ -180,8 +180,7 @@ const SegmentedCommitBar: React.FC<{
 const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
     <div className="space-y-2">
-   
-/* ---------- inside CommitSection map ---------- */
+
 
 {commitments.map((c) => {
   const startForBar = c.id === 'sleep' ? 4 : 0;
