@@ -12,13 +12,13 @@ import CommitSection from '../components/CommitSection';
 const Index = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [currentView, setCurrentView] = useState<'planning' | 'schedule'>('planning');
-const [commitments, setCommitments] = useState({
-  focusTime: 3,    // ✅ default selected (green)
-  sleep: 8,
-  nutrition: 2,
-  movement: 1,
-  downtime: 1.5,   // ✅ default selected (green)
-});
+  const [commitments, setCommitments] = useState([
+    { id: 'focusTime', name: 'Focus Time', value: 3, max: 12, step: 0.5, unit: 'h', borderTone: 'blue' as const },
+    { id: 'sleep', name: 'Sleep', value: 8, max: 12, step: 0.5, unit: 'h', borderTone: 'blue' as const },
+    { id: 'nutrition', name: 'Nutrition', value: 2, max: 6, step: 0.5, unit: 'h', borderTone: 'purple' as const },
+    { id: 'movement', name: 'Movement', value: 1, max: 4, step: 0.5, unit: 'h', borderTone: 'teal' as const },
+    { id: 'downtime', name: 'Downtime', value: 1.5, max: 6, step: 0.5, unit: 'h', borderTone: 'indigo' as const },
+  ]);
 
 
   const addTask = async (title: string, duration?: number, scheduledDay?: 'today' | 'tomorrow') => {
@@ -114,13 +114,12 @@ const [commitments, setCommitments] = useState({
   };
 
   const updateCommitment = (
-    type: 'focusTime' | 'sleep' | 'nutrition' | 'movement' | 'downtime',
+    id: string,
     hours: number
   ) => {
-    setCommitments(prev => ({
-      ...prev,
-      [type]: hours
-    }));
+    setCommitments(prev => prev.map(commitment => 
+      commitment.id === id ? { ...commitment, value: hours } : commitment
+    ));
   };
 
   return (
@@ -182,35 +181,33 @@ const [commitments, setCommitments] = useState({
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-gray-900">Daily Commitment</h3>
                 <span className="text-sm text-gray-500">
-                  {(commitments.focusTime + commitments.sleep + commitments.nutrition + commitments.movement + commitments.downtime).toFixed(1)}/24 hours
+                  {commitments.reduce((sum, c) => sum + c.value, 0).toFixed(1)}/24 hours
                 </span>
               </div>
 
               {/* 24h translucent target bar */}
               <div className="w-full h-4 rounded-full overflow-hidden bg-muted/30 ring-1 ring-border/50 flex">
-                {/* Sleep (grey) */}
-                {commitments.sleep > 0 && (
-                  <div className="bg-zinc-400/40 h-full" style={{ width: `${(commitments.sleep / 24) * 100}%` }} title={`Sleep: ${commitments.sleep}h`} />
-                )}
-                {/* Focus (deep tint) */}
-                {commitments.focusTime > 0 && (
-                  <div className="bg-blue-500/25 h-full" style={{ width: `${(commitments.focusTime / 24) * 100}%` }} title={`Focus: ${commitments.focusTime}h`} />
-                )}
-                {/* Nutrition (violet tint) */}
-                {commitments.nutrition > 0 && (
-                  <div className="bg-violet-500/25 h-full" style={{ width: `${(commitments.nutrition / 24) * 100}%` }} title={`Nutrition: ${commitments.nutrition}h`} />
-                )}
-                {/* Movement (emerald tint) */}
-                {commitments.movement > 0 && (
-                  <div className="bg-emerald-500/25 h-full" style={{ width: `${(commitments.movement / 24) * 100}%` }} title={`Movement: ${commitments.movement}h`} />
-                )}
-                {/* Downtime (sky tint) */}
-                {commitments.downtime > 0 && (
-                  <div className="bg-sky-500/25 h-full" style={{ width: `${(commitments.downtime / 24) * 100}%` }} title={`Downtime: ${commitments.downtime}h`} />
-                )}
+                {commitments.map(commitment => {
+                  if (commitment.value <= 0) return null;
+                  const colorMap = {
+                    focusTime: 'bg-blue-500/25',
+                    sleep: 'bg-zinc-400/40',
+                    nutrition: 'bg-violet-500/25',
+                    movement: 'bg-emerald-500/25',
+                    downtime: 'bg-sky-500/25'
+                  };
+                  return (
+                    <div 
+                      key={commitment.id}
+                      className={`${colorMap[commitment.id as keyof typeof colorMap]} h-full`} 
+                      style={{ width: `${(commitment.value / 24) * 100}%` }} 
+                      title={`${commitment.name}: ${commitment.value}h`} 
+                    />
+                  );
+                })}
                 {/* Remainder */}
                 {(() => {
-                  const used = commitments.focusTime + commitments.sleep + commitments.nutrition + commitments.movement + commitments.downtime;
+                  const used = commitments.reduce((sum, c) => sum + c.value, 0);
                   const remain = Math.max(0, 24 - used);
                   return remain > 0 ? (
                     <div className="bg-muted/40 h-full" style={{ width: `${(remain / 24) * 100}%` }} title={`Unallocated: ${remain}h`} />
@@ -220,11 +217,23 @@ const [commitments, setCommitments] = useState({
 
               {/* Legend */}
               <div className="flex flex-wrap gap-4 text-xs text-gray-600 mt-2">
-                {commitments.sleep > 0 && <Legend color="bg-zinc-400/40" label={`Sleep (${commitments.sleep}h)`} />}
-                {commitments.focusTime > 0 && <Legend color="bg-blue-500/25" label={`Focus (${commitments.focusTime}h)`} />}
-                {commitments.nutrition > 0 && <Legend color="bg-violet-500/25" label={`Nutrition (${commitments.nutrition}h)`} />}
-                {commitments.movement > 0 && <Legend color="bg-emerald-500/25" label={`Movement (${commitments.movement}h)`} />}
-                {commitments.downtime > 0 && <Legend color="bg-sky-500/25" label={`Downtime (${commitments.downtime}h)`} />}
+                {commitments.map(commitment => {
+                  if (commitment.value <= 0) return null;
+                  const colorMap = {
+                    focusTime: 'bg-blue-500/25',
+                    sleep: 'bg-zinc-400/40',
+                    nutrition: 'bg-violet-500/25',
+                    movement: 'bg-emerald-500/25',
+                    downtime: 'bg-sky-500/25'
+                  };
+                  return (
+                    <Legend 
+                      key={commitment.id}
+                      color={colorMap[commitment.id as keyof typeof colorMap]} 
+                      label={`${commitment.name} (${commitment.value}h)`} 
+                    />
+                  );
+                })}
               </div>
             </div>
 
