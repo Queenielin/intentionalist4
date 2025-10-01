@@ -130,31 +130,67 @@ const defaultIdx = defaultValue !== undefined
       <div className="inline-grid grid-flow-col auto-cols-[28px] gap-0 rounded-md shadow-sm overflow-hidden select-none">
         {Array.from({ length: segments }).map((_, idx) => {
           const endVal = start + (idx + 1) * step;
+          const tone = colorForIndex(idx, endVal);
 
-// CHANGED: light fill for inactive; solid for active; stronger text color
-const solidTone =
-  tone === 'red'
-    ? 'bg-red-500 text-white'
-    : tone === 'orange'
-    ? 'bg-orange-500 text-white'
-    : 'bg-green-600 text-white';
+          const solidTone =
+            tone === 'red'
+              ? 'bg-red-500 text-white'
+              : tone === 'orange'
+              ? 'bg-orange-500 text-white'
+              : 'bg-green-600 text-white';
 
-const lightTone =
-  tone === 'red'
-    ? 'bg-red-200 text-red-800'
-    : tone === 'orange'
-    ? 'bg-orange-200 text-orange-800'
-    : 'bg-green-200 text-green-800';
+          const lightTone =
+            tone === 'red'
+              ? 'bg-red-200 text-red-800'
+              : tone === 'orange'
+              ? 'bg-orange-200 text-orange-800'
+              : 'bg-green-200 text-green-800';
 
-// REPLACE prior class selection with:
-const appliedTone = active ? solidTone : lightTone;
+          const appliedTone = active ? solidTone : lightTone;
 
+          const baseDivider =
+            idx === 0
+              ? ''
+              : idx === lightDividerAt
+              ? 'border-l border-l-gray-200'
+              : 'border-l border-l-gray-300';
 
+          const label = labelsEnabled && showLabelAtIndex ? showLabelAtIndex(idx, endVal) : undefined;
+          const tip = tipForEndVal ? tipForEndVal(endVal) : '';
 
-      
-          const active = idx === selectedIdx;
+          const Square = (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onChange(endVal)}
+              className={cn(
+                'relative h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors',
+                appliedTone,
+                baseDivider,
+                active && 'font-bold',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary'
+              )}
+              aria-pressed={active}
+            >
+              {active ? (
+                <span className="pointer-events-none select-none text-current">{formatHours(endVal)}</span>
+              ) : label ? (
+                <span className="pointer-events-none select-none text-current">{label}</span>
+              ) : null}
+            </button>
+          );
 
-          const bg =
+          return tipForEndVal ? (
+            <Tooltip key={idx}>
+              <TooltipTrigger asChild>{Square}</TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6} className="max-w-xs text-xs leading-snug">
+                {tip}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            Square
+          );
+        })}
             tone === 'red'
               ? active ? 'bg-red-500' : 'bg-red-100'
               : tone === 'orange'
