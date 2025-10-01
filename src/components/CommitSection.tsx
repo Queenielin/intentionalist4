@@ -24,6 +24,8 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-6;
 
 const FIXED_SEGMENTS = 12;
+const CELL_STEP = 0.5; // each cell represents 0.5h
+
 
 const getToneBg = (tone: string) => {
   switch (tone) {
@@ -124,36 +126,42 @@ type Tone = 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
 
 const SegmentedCommitBar: React.FC<{
   start: number;          // e.g., sleep=4, others=0
-  max: number;            // e.g., 6 or 10
-  allowedStep: number;    // original step (0.5 / 1)
-  selectedIdx: number;    // which cell is active
+  max: number;            // kept for clamping, but last cell is start+5.5
+  allowedStep: number;    // your original step (0.5 / 1)
+  selectedIdx: number;    // active cell index
   onChange: (value: number) => void;
   borderTone: Tone;
   name: string;
 }> = ({ start, max, allowedStep, selectedIdx, onChange, borderTone, name }) => {
-  const toneRing = getBorderColor(borderTone); // returns ring-*
-  const toneBg = getToneBg(borderTone);        // returns bg-*
+  const toneRing = getBorderColor(borderTone); // ring-*
+  const toneBg = getToneBg(borderTone);        // bg-*
+  const displayMax = start + (FIXED_SEGMENTS - 1) * CELL_STEP; // start + 5.5
 
   return (
     <div
       className={cn(
         'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
-        'ring-4', toneRing,
+        'ring-2', toneRing,
         toneBg
       )}
     >
       {Array.from({ length: FIXED_SEGMENTS }).map((_, idx) => {
-        // Map index -> raw value in 0.5h steps, but force last cell to max
-        let raw = start + idx * CELL_STEP;
-        if (idx === FIXED_SEGMENTS - 1) raw = max;
+        // 0..5.5 (or 4..9.5 for sleep), 0.5h increments
+        const displayVal = start + idx * CELL_STEP;
 
-        const snappedVal = clamp(snapTo(raw, allowedStep), start, max);
+        // snap to your step and clamp to displayed range (not beyond the last cell)
+        const snappedVal = clamp(
+          snapTo(displayVal, allowedStep),
+          start,
+          Math.min(displayMax, max)
+        );
+
         const active = idx === selectedIdx;
 
-        // Label at endpoints and whole hours (including the max on last cell)
+        // Label only on whole numbers, and never on the last cell
         const showLabel =
-          idx === 0 || idx === FIXED_SEGMENTS - 1 || isInt(snappedVal)
-            ? String(Math.round(snappedVal))
+          idx !== FIXED_SEGMENTS - 1 && Number.isInteger(displayVal)
+            ? String(displayVal) // safe: it's an integer already
             : null;
 
         return (
@@ -182,16 +190,16 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
     <div className="space-y-2">
 
 
-{commitments.map((c) => {
-  const startForBar = c.id === 'sleep' ? 4 : 0;
 
-  // map current value -> cell index:
-  // - values < max use 0.5h spacing
-  // - exactly max sits on the last cell
+      {commitments.map((c) => {
+  const startForBar = c.id === 'sleep' ? 4 : 0;
+  const displayMax = startForBar + (FIXED_SEGMENTS - 1) * CELL_STEP; // start+5.5
+
+  // map current value -> cell index on a 0.5h grid, clamped to [0..11]
   const idxFromValue = (v: number) => {
-    if (v >= c.max) return FIXED_SEGMENTS - 1;                  // last cell for max
-    const i = Math.round((v - startForBar) / CELL_STEP);        // 0.5h steps
-    return Math.max(0, Math.min(FIXED_SEGMENTS - 2, i));        // reserve last for max
+    const clamped = clamp(v, startForBar, displayMax);
+    const i = Math.round((clamped - startForBar) / CELL_STEP);
+    return Math.max(0, Math.min(FIXED_SEGMENTS - 1, i));
   };
 
   const selectedIdx = idxFromValue(c.value);
@@ -200,7 +208,9 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
     <div key={c.id} className="space-y-1">
       <div className="flex items-baseline justify-between">
         <h3 className="font-medium text-gray-700">{c.name}</h3>
-        <p className="text-sm text-gray-600 font-medium">{c.value} {c.unit}</p>
+        <p className="text-sm text-gray-600 font-medium">
+          {c.value} {c.unit}
+        </p>
       </div>
 
       <SegmentedCommitBar
