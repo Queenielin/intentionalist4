@@ -409,13 +409,33 @@ function DailyCommitmentBar({
         ? 'bg-green-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-green-500'
         : tone === 'orange'
         ? 'bg-orange-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-orange-500'
-        : 'bg-red-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-red-500';
+        : tone === 'red'
+        ? 'bg-red-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-red-500'
+        : tone === 'blue'
+        ? 'bg-blue-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-blue-500'
+        : tone === 'purple'
+        ? 'bg-purple-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-purple-500'
+        : tone === 'teal'
+        ? 'bg-teal-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-teal-500'
+        : tone === 'indigo'
+        ? 'bg-indigo-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-indigo-500'
+        : 'bg-gray-200 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1/2 after:bg-gray-500';
     }
     return tone === 'green'
       ? 'bg-green-500'
       : tone === 'orange'
       ? 'bg-orange-500'
-      : 'bg-red-500';
+      : tone === 'red'
+      ? 'bg-red-500'
+      : tone === 'blue'
+      ? 'bg-blue-500'
+      : tone === 'purple'
+      ? 'bg-purple-500'
+      : tone === 'teal'
+      ? 'bg-teal-500'
+      : tone === 'indigo'
+      ? 'bg-indigo-500'
+      : 'bg-gray-500';
   };
 
   return (
@@ -453,7 +473,7 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         segments={8}
         step={0.5}
         start={5.0} // 5.5, 6.0, ..., 9.0
-        colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'green')}
+        colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'blue')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipSleep}
 defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
@@ -470,7 +490,7 @@ defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
         segments={7}
         step={0.5}
         start={0.0} // 0.5, 1.0, ..., 3.0
-        colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'green')}
+        colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'purple')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipNutrition}
         defaultValue={DEFAULT_COMMITMENTS.nutrition} // <-- ADDED on the first Focus bar
@@ -486,7 +506,7 @@ defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
         segments={8}
         step={0.5}
         start={0.0}
-        colorForIndex={() => 'green'}
+        colorForIndex={() => 'teal'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipMovement}
         defaultValue={DEFAULT_COMMITMENTS.movement} // <-- ADDED on the first Focus bar
@@ -502,7 +522,7 @@ defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
         segments={6}
         step={0.5}
         start={0.0}
-        colorForIndex={() => 'green'}
+        colorForIndex={() => 'indigo'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipDowntime}
         defaultValue={DEFAULT_COMMITMENTS.downtime} // <-- ADDED on the first Focus bar
@@ -516,10 +536,10 @@ defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
           blocks={[
             // CHANGED/CONFIG: map per-category to a tone you want to reuse
             { key: 'focusTime', hours: commitments.focusTime, color: 'orange' }, // e.g., focus = orange
-            { key: 'sleep', hours: commitments.sleep, color: 'green' },         // sleep = green
-            { key: 'nutrition', hours: commitments.nutrition, color: 'green' }, // meals = green (or orange)
-            { key: 'movement', hours: commitments.movement, color: 'green' },   // movement = green
-            { key: 'downtime', hours: commitments.downtime, color: 'red' },     // downtime = red (or orange/green by policy)
+            { key: 'sleep', hours: commitments.sleep, color: 'blue' },         // sleep = blue
+            { key: 'nutrition', hours: commitments.nutrition, color: 'purple' }, // meals = purple
+            { key: 'movement', hours: commitments.movement, color: 'teal' },   // movement = teal
+            { key: 'downtime', hours: commitments.downtime, color: 'indigo' },     // downtime = indigo
           ]}
         />
         <p className="mt-1 text-xs text-muted-foreground">
