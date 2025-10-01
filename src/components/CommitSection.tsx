@@ -124,7 +124,7 @@ const defaultIdx = defaultValue !== undefined
         {Array.from({ length: segments }).map((_, idx) => {
           const endVal = start + (idx + 1) * step;
           const tone = colorForIndex(idx, endVal);
-          const active = idx <= selectedIdx;
+          const active = idx === selectedIdx;
 
           const bg =
             tone === 'red'
