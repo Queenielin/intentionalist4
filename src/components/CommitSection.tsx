@@ -133,7 +133,7 @@ return (
 className={cn(
   'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
   'border-l-3', BORDER_COLOR,
-  idx === segments - 1 && 'border-r-2',
+  idx === segments - 1 && 'border-r-3',
   idx === segments - 1 && BORDER_COLOR,
   'rounded-none',
   active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
