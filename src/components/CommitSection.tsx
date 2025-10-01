@@ -141,7 +141,9 @@ const SegmentedCommitBar: React.FC<{
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
       
-   const endVal = start + idx * step; // first cell is start (0 for most, 4 for sleep)
+   const endVal = Number((start + idx * step).toFixed(4)); // tame floats
+
+      
 const active = idx === selectedIdx;
 const showLabel = active || Number.isInteger(endVal) ? String(endVal) : null;
 
