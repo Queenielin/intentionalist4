@@ -117,19 +117,22 @@ const getUnselectedColor = (value: number, type: string) => {
 
 /* ---------- segmented bar ---------- */
 
+
+const CELL_STEP = 0.5; // each cell = 0.5 hr
+
 type Tone = 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
 
 const SegmentedCommitBar: React.FC<{
   start: number;          // e.g., sleep=4, others=0
   max: number;            // e.g., 6 or 10
-  allowedStep: number;    // your original step (0.5 / 1 / etc.)
-  selectedIdx: number;    // based on current value projected to 12 cells
+  allowedStep: number;    // original step (0.5 / 1)
+  selectedIdx: number;    // which cell is active
   onChange: (value: number) => void;
   borderTone: Tone;
   name: string;
 }> = ({ start, max, allowedStep, selectedIdx, onChange, borderTone, name }) => {
-  const toneRing = getBorderColor(borderTone); // ring-*
-  const toneBg = getToneBg(borderTone);        // bg-* (for the gaps background)
+  const toneRing = getBorderColor(borderTone); // returns ring-*
+  const toneBg = getToneBg(borderTone);        // returns bg-*
 
   return (
     <div
@@ -140,13 +143,14 @@ const SegmentedCommitBar: React.FC<{
       )}
     >
       {Array.from({ length: FIXED_SEGMENTS }).map((_, idx) => {
-        // position 0..1 across 12 cells
-        const t = FIXED_SEGMENTS === 1 ? 0 : idx / (FIXED_SEGMENTS - 1);
-        // raw value at this cell, then snap to allowed step and clamp
-        const raw = start + t * (max - start);
-        const snappedVal = clamp(snapTo(raw, allowedStep), start, max);
+        // Map index -> raw value in 0.5h steps, but force last cell to max
+        let raw = start + idx * CELL_STEP;
+        if (idx === FIXED_SEGMENTS - 1) raw = max;
 
+        const snappedVal = clamp(snapTo(raw, allowedStep), start, max);
         const active = idx === selectedIdx;
+
+        // Label at endpoints and whole hours (including the max on last cell)
         const showLabel =
           idx === 0 || idx === FIXED_SEGMENTS - 1 || isInt(snappedVal)
             ? String(Math.round(snappedVal))
