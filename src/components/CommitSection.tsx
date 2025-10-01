@@ -123,66 +123,56 @@ const getUnselectedColor =  (value: number, type: string) => {
 };
 
 
+// SegmentedCommitBar：12 格只管「顯示位置」；真正回傳的值一律貼齊 allowedStep
 const SegmentedCommitBar: React.FC<{
-  segments: number;
-  step: number;
-  start: number;
-  selectedIdx: number;
+  segments: number;            // 固定 12
+  start: number;               // 例：sleep=4，其它=0
+  max: number;                 // 例：focus=6, sleep=10...
+  allowedStep: number;         // 你原本的步進（0.5 或 1）
+  selectedIdx: number;         // 用當前值換算成的格索引
   onChange: (value: number) => void;
   borderTone: 'blue' | 'cyan' | 'purple' | 'teal' | 'indigo';
   name: string;
-  max?: number;
-}> = ({ segments, step, start, selectedIdx, onChange, borderTone, name }) => {
+}> = ({ segments, start, max, allowedStep, selectedIdx, onChange, borderTone, name }) => {
   const BORDER_COLOR = getBorderColor(borderTone);
-  const BG_TONE = getToneBg(borderTone);
+  const BG_TONE = getToneBg(borderTone); // 和你的 tone 對上（可沿用前面提供的 getToneBg）
 
   return (
     <div className={cn(
-     'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
-+       'ring-4',
-+       BORDER_COLOR,
-+       BG_TONE // gap color comes from container background
-      
+      'grid grid-cols-12 gap-px p-px rounded-sm overflow-hidden',
+      'ring-2', BORDER_COLOR, BG_TONE
     )}>
       {Array.from({ length: segments }).map((_, idx) => {
-      
-   const endVal = Number((start + idx * step).toFixed(4)); // tame floats
+        // 這格在 0~1 的位置（0=左端，1=右端）
+        const t = segments === 1 ? 0 : idx / (segments - 1);
+        // 把 t 投影到實際範圍，再「貼齊」原步進
+        const valRaw = start + t * (max - start);
+        const snappedVal = clamp(snapTo(valRaw, allowedStep), start, max);
 
-      
-const active = idx === selectedIdx;
-const showLabel = active || Number.isInteger(endVal) ? String(endVal) : null;
+        const active = idx === selectedIdx;
+        const showLabel = (idx === 0 || idx === segments - 1 || isInt(snappedVal))
+          ? String(Math.round(snappedVal))
+          : null;
 
-return (
-  <div
-    key={idx}
-   
-    
-    
-className={cn(
-
-
- // No per-cell borders; equal-sized grid cells; box-border avoids layout weirdness
-'h-6 w-full box-border flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-     'rounded-none',
-  
-  active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
-  active && 'font-bold'
-)}
-
-
-    
-  onClick={() => onChange(max !== undefined ? Math.min(endVal, max) : endVal)}
-    
-  >
-    {showLabel}
-  </div>
-);
-
-      
+        return (
+          <div
+            key={idx}
+            className={cn(
+              'h-6 w-full box-border flex items-center justify-center text-[11px] font-medium cursor-pointer transition-colors',
+              active ? getRecommendationColor(snappedVal, name) : getUnselectedColor(snappedVal, name),
+              active && 'font-bold'
+            )}
+            onClick={() => onChange(snappedVal)}
+            title={`${snappedVal}h`}
+          >
+            {showLabel}
+          </div>
+        );
       })}
     </div>
   );
 };
+
 
 const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
