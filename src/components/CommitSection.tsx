@@ -174,16 +174,36 @@ const SegmentedCommitBar: React.FC<{
 };
 
 
-const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
+// CommitSection：索引用「當前值」反推到 12 格的位置（不改你的值），sleep 從 4 開始
+{commitments.map((c) => {
+  const startForBar = c.id === 'sleep' ? 4 : 0;
+  const segments = FIXED_SEGMENTS;
+
+  // 用目前 value 在區間的比例，換算到 12 格（不會出現奇怪小數）
+  const ratio = (c.value - startForBar) / (c.max - startForBar);
+  const selectedIdx = Math.max(0, Math.min(segments - 1, Math.round(ratio * (segments - 1))));
+
   return (
-   
-      <div className="space-y-2">
-       
+    <div key={c.id} className="space-y-1">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-medium text-gray-700">{c.name}</h3>
+        <p className="text-sm text-gray-600 font-medium">{c.value} {c.unit}</p>
+      </div>
 
+      <SegmentedCommitBar
+        segments={segments}
+        start={startForBar}
+        max={c.max}
+        allowedStep={c.step}                  // ← 保留你的「原邏輯步進」
+        selectedIdx={selectedIdx}
+        onChange={(v) => onUpdateCommitment(c.id, v)} // ← 回傳的一定是貼齊步進的值
+        borderTone={c.borderTone}
+        name={c.name}
+      />
+    </div>
+  );
+})}
 
-        {commitments.map((commitment) => {
-  
-        
   
 const startForBar = commitment.id === 'sleep' ? 4 : 0; // keep your sleep start at 4h
         
