@@ -128,8 +128,7 @@ const SegmentedCommitBar: React.FC<{
 
 const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateCommitment }) => {
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-800">Daily Commitments</h2>
+   
       <div className="space-y-4">
         {commitments.map((commitment) => {
           const segments = commitment.max / commitment.step;
