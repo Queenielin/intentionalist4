@@ -29,7 +29,7 @@ const CELL_STEP = 0.5; // each cell represents 0.5h
 
 const getToneBg = (tone: string) => {
   switch (tone) {
-    case 'blue': return 'bg-blue-500';
+    case 'deep-work': return 'bg-[hsl(var(--deep-work))]';
     case 'cyan': return 'bg-cyan-500';
     case 'purple': return 'bg-purple-500';
     case 'teal': return 'bg-teal-500';
@@ -40,7 +40,7 @@ const getToneBg = (tone: string) => {
 
 const getBorderColor = (tone: string) => {
   switch (tone) {
-    case 'blue': return 'ring-blue-500';
+    case 'deep-work': return 'ring-[hsl(var(--deep-work))]';
     case 'cyan': return 'ring-cyan-500';
     case 'purple': return 'ring-purple-500';
     case 'teal': return 'ring-teal-500';
