@@ -23,7 +23,7 @@ interface CommitSectionProps {
 }
 
 const DEFAULT_COMMITMENTS = {
-  focusTime: 4,
+  focusTime: 3,
   sleep: 8,
   nutrition: 2,
   movement: 1,
@@ -31,51 +31,27 @@ const DEFAULT_COMMITMENTS = {
 };
 
 const toneClasses = (tone: 'red' | 'orange' | 'green' | 'blue' | 'purple' | 'teal' | 'indigo', active: boolean) => {
+  // Square fill colors: green/orange/red based on research recommendations
   const bg = active
-    ? tone === 'red'
-      ? 'bg-red-500'
-      : tone === 'orange'
-      ? 'bg-orange-500'
-      : tone === 'green'
-      ? 'bg-green-600'
-      : tone === 'blue'
-      ? 'bg-blue-500'
-      : tone === 'purple'
-      ? 'bg-purple-500'
-      : tone === 'teal'
-      ? 'bg-teal-500'
-      : 'bg-indigo-500'
-    : tone === 'red'
-    ? 'bg-red-100'
-    : tone === 'orange'
-    ? 'bg-orange-100'
-    : tone === 'green'
-    ? 'bg-green-100'
-    : tone === 'blue'
-    ? 'bg-blue-100'
-    : tone === 'purple'
-    ? 'bg-purple-100'
-    : tone === 'teal'
-    ? 'bg-teal-100'
-    : 'bg-indigo-100';
+    ? tone === 'red' ? 'bg-red-500'
+      : tone === 'orange' ? 'bg-orange-500'
+      : 'bg-green-500'
+    : tone === 'red' ? 'bg-red-100'
+      : tone === 'orange' ? 'bg-orange-100'
+      : 'bg-green-100';
 
-  const fg = active
-    ? 'text-white'
-    : tone === 'red'
-    ? 'text-red-700'
-    : tone === 'orange'
-    ? 'text-orange-700'
-    : tone === 'green'
-    ? 'text-green-700'
-    : tone === 'blue'
-    ? 'text-blue-700'
-    : tone === 'purple'
-    ? 'text-purple-700'
-    : tone === 'teal'
-    ? 'text-teal-700'
-    : 'text-indigo-700';
+  // Border colors: unique ID color for each commitment type
+  const borderColor = tone === 'blue' ? 'border-blue-600'
+    : tone === 'purple' ? 'border-purple-600'
+    : tone === 'teal' ? 'border-teal-600'
+    : tone === 'indigo' ? 'border-indigo-600'
+    : tone === 'red' ? 'border-red-600'
+    : tone === 'orange' ? 'border-orange-600'
+    : 'border-green-600';
 
-  return `${bg} ${fg}`;
+  const fg = active ? 'text-white' : 'text-gray-700';
+
+  return `${bg} ${fg} border-2 ${borderColor}`;
 };
 
 function tipFocus(endVal: number) {
@@ -287,12 +263,12 @@ function FocusTimeMultiBars({
   segments={segments}
   step={step}
   start={start1}
-  colorForIndex={colorBar1}
+        colorForIndex={(_idx, endVal) => 'green'} // Focus Time uses green squares with blue border
   showLabelAtIndex={fullHourLabel}
   lightDividerAt={1}
   tipForEndVal={tipFocus}   // ✅ add this line
    // ADD this prop to the Focus Time bar
-defaultValue={DEFAULT_COMMITMENTS.focusTime}
+        defaultValue={DEFAULT_COMMITMENTS.focusTime}
 
 />
 
@@ -312,7 +288,7 @@ defaultValue={DEFAULT_COMMITMENTS.focusTime}
         segments={segments}
         step={step}
         start={start2 ?? 0}
-        colorForIndex={(idx) => colorBarN(idx)}
+        colorForIndex={(_idx) => 'green'} // Focus Time uses green squares
         showLabelAtIndex={fullHourLabel}
         disabled={start2 == null}
       />
@@ -330,7 +306,7 @@ defaultValue={DEFAULT_COMMITMENTS.focusTime}
         segments={segments}
         step={step}
         start={start3 ?? 0}
-        colorForIndex={(idx) => colorBarN(idx)}
+        colorForIndex={(_idx) => 'green'} // Focus Time uses green squares
         showLabelAtIndex={fullHourLabel}
         disabled={start3 == null}
       />
@@ -362,10 +338,10 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         segments={8}
         step={0.5}
         start={5.0} // 5.5, 6.0, ..., 9.0
-        colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'blue')}
+        colorForIndex={(_idx, endVal) => (endVal <= 6 ? 'red' : endVal === 6.5 ? 'orange' : 'green')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipSleep}
-        defaultValue={DEFAULT_COMMITMENTS.sleep} // <-- ADDED on the first Focus bar
+        defaultValue={DEFAULT_COMMITMENTS.sleep}
 
       />
 
@@ -379,10 +355,10 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         segments={7}
         step={0.5}
         start={0.0} // 0.5, 1.0, ..., 3.0
-        colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'purple')}
+        colorForIndex={(_idx, endVal) => (endVal === 0.5 ? 'red' : endVal === 1.0 ? 'orange' : 'green')}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipNutrition}
-        defaultValue={DEFAULT_COMMITMENTS.nutrition} // <-- ADDED on the first Focus bar
+        defaultValue={DEFAULT_COMMITMENTS.nutrition}
 
       />
 
@@ -395,10 +371,10 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         segments={8}
         step={0.5}
         start={0.0}
-        colorForIndex={() => 'teal'}
+        colorForIndex={() => 'green'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipMovement}
-        defaultValue={DEFAULT_COMMITMENTS.movement} // <-- ADDED on the first Focus bar
+        defaultValue={DEFAULT_COMMITMENTS.movement}
 
       />
 
@@ -411,10 +387,10 @@ export default function CommitSection({ commitments, onUpdateCommitment }: Commi
         segments={6}
         step={0.5}
         start={0.0}
-        colorForIndex={() => 'indigo'}
+        colorForIndex={() => 'green'}
         showLabelAtIndex={(_idx, endVal) => (Number.isInteger(endVal) ? String(endVal) : undefined)}
         tipForEndVal={tipDowntime}
-        defaultValue={DEFAULT_COMMITMENTS.downtime} // <-- ADDED on the first Focus bar
+        defaultValue={DEFAULT_COMMITMENTS.downtime}
 
       />
 
