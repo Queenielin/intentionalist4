@@ -27,6 +27,8 @@ const getBorderColor = (tone: string) => {
   }
 };
 
+
+
 const getRecommendationColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
     if (value >= 2 && value <= 4) return 'bg-green-600';
@@ -35,30 +37,28 @@ const getRecommendationColor = (value: number, type: string) => {
   }
   if (type === 'Sleep') {
     if (value >= 7 && value <= 9) return 'bg-green-600';
+    // NOTE: You may want (value >= 6 && value < 7) || (value > 9 && value <= 10) here.
     if ((value >= 6 && value < 7) || (value > 8 && value <= 9)) return 'bg-orange-600';
     return 'bg-red-600';
   }
   if (type === 'Movement') {
-    if (value >= 0.5 ) return 'bg-green-600';
-    
-  
-    
+    if (value >= 0.5) return 'bg-green-600';
     return 'bg-red-600';
   }
   if (type === 'Nutrition') {
     if (value >= 1 && value <= 3) return 'bg-green-600';
-    if (value > 3.5 && value < 5) ) return 'bg-orange-600';
+    if (value > 3 && value < 5) return 'bg-orange-600'; // FIX: removed extra ')', adjusted threshold
     return 'bg-red-600';
   }
-  
   if (type === 'Downtime') {
     if (value >= 1 && value <= 2) return 'bg-green-600';
-    if ((value > 2 ) return 'bg-orange-600';
+    if (value > 2 && value <= 3) return 'bg-orange-600'; // FIX: added missing ')', defined upper bound
     return 'bg-red-600';
   }
-  
   return 'bg-gray-600';
 };
+
+
 
 const getUnselectedColor = (value: number, type: string) => {
   if (type === 'Focus Time') {
@@ -114,14 +114,21 @@ const showLabel = active || Number.isInteger(endVal) ? String(endVal) : null;
 return (
   <div
     key={idx}
-    className={cn(
-      'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
-      'border-l-2', BORDER_COLOR,                         // thicker seams
-      ...(idx === segments - 1 ? ['border-r-2', BORDER_COLOR] : []),
-      'rounded-none',
-      active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
-      active && 'font-bold'
-    )}
+   
+    
+    
+className={cn(
+  'h-6 w-6 flex items-center justify-center text-[11px] font-medium transition-colors cursor-pointer',
+  'border-l-2', BORDER_COLOR,
+  idx === segments - 1 && 'border-r-2',
+  idx === segments - 1 && BORDER_COLOR,
+  'rounded-none',
+  active ? getRecommendationColor(endVal, name) : getUnselectedColor(endVal, name),
+  active && 'font-bold'
+)}
+
+
+    
     onClick={() => onChange(endVal)}
   >
     {showLabel}
