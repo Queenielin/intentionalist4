@@ -81,10 +81,9 @@ function SegmentedCommitBar({
   lightDividerAt,
   disabled = false,
   tipForEndVal,            // ✅ NEW/RESTORED: per-square tooltip content
+  defaultValue,
 }: {
 
-  defaultValue?: number;  // ← ADD THIS LINE
-}: {
   title?: string;
   subtitle?: string;
   value: number;
@@ -99,7 +98,7 @@ function SegmentedCommitBar({
   lightDividerAt?: number;
   disabled?: boolean;
   tipForEndVal?: (endVal: number) => string;  // ✅
-defaultValue?: number;  // ← ADD THIS LINE
+  defaultValue?: number;
   
 }) {
  
