@@ -16,6 +16,22 @@ interface CommitSectionProps {
   onUpdateCommitment: (id: string, value: number) => void;
 }
 
+// 1) Add this constant:
+const FIXED_SEGMENTS = 12;
+
+// 2) Add a bg tone helper (to color the "gaps" cleanly with the same tone):
+const getToneBg = (tone: string) => {
+  switch (tone) {
+    case 'blue': return 'bg-blue-500';
+    case 'cyan': return 'bg-cyan-500';
+    case 'purple': return 'bg-purple-500';
+    case 'teal': return 'bg-teal-500';
+    case 'indigo': return 'bg-indigo-500';
+    default: return 'bg-blue-500';
+  }
+};
+
+
 const getBorderColor = (tone: string) => {
   switch (tone) {
     case 'blue': return 'border-blue-500';
