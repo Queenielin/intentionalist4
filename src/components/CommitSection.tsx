@@ -134,7 +134,7 @@ const CommitSection: React.FC<CommitSectionProps> = ({ commitments, onUpdateComm
           const segments = commitment.max / commitment.step;
           const selectedIdx = Math.floor(commitment.value / commitment.step) - 1;
           
-          return (
+          // CHANGED: header row (title + hour), bar below
           
             
             {*/ CHANGED: header row (title + hour), bar below*/}
